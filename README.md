@@ -10,12 +10,12 @@ Supervised by **Eng. Alaa Samir**
 
 ## 👥 Team
 
-- Abdelrahman El-Sayed El-Shahawy  
+- Abdelrahman ElSayed Elshhawy  
 - Mohamed Khairy Eid Elzeblawy  
 - Rouaa Sameh Elbadrawy  
 - Farida Abdelhalim Mohamed Abdelaal  
 - Wasim Ebada Mohamed Abouajaga  
-- Mostafa Abdel-Sadek Mohamed Zayed 
+- Mostafa AbdelSadek Mohamed Zayed 
 
 ---
 

@@ -50,27 +50,266 @@ It eliminates manual processes, prevents proxy attendance, and enables data-driv
 - RAG-powered policy integration
 
 ---
+## 📂 Project Structure
 
-# 🏗 Architecture
 ```bash
-Camera
-↓
-Face Detection
-↓
-Face Embedding
-↓
-Similarity Matching
-↓
-PostgreSQL Database
-↓
-Analytics Engine
-↓
-LLM Report Generator
-↓
-Dashboard
+AI-Smart-Attendance-System/
+│
+├── backend/
+│   ├── api/                        # FastAPI route handlers
+│   │   ├── attendance.py
+│   │   ├── students.py
+│   │   └── analytics.py
+│   │
+│   ├── services/                   # Business logic layer
+│   │   ├── attendance_service.py
+│   │   ├── analytics_service.py
+│   │   └── llm_service.py
+│   │
+│   ├── models/                     # SQLAlchemy database models
+│   │   ├── student_model.py
+│   │   ├── attendance_model.py
+│   │   └── risk_model.py
+│   │
+│   ├── core/                       # Infrastructure layer
+│   │   ├── vector_index.py         # FAISS manager (persistent index)
+│   │   └── dependencies.py         # Shared system instances
+│   │
+│   ├── database.py
+│   ├── config.py
+│   └── main.py
+│
+├── face_recognition/               # AI Layer
+│   ├── detector.py                 # Face detection model
+│   ├── embedder.py                 # Face embedding model
+│   └── recognition_pipeline.py     # Detection + Embedding + Matching
+│
+├── llm_module/                     # LLM & RAG layer
+│   ├── rag_pipeline.py
+│   └── prompts.py
+│
+├── storage/                        # Persistent system artifacts
+│   └── faiss_index/                # Saved FAISS index files
+│
+├── frontend/
+│   └── streamlit_app.py
+│
+├── docker/
+│   ├── Dockerfile
+│   └── docker-compose.yml
+│
+├── requirements.txt
+├── .env
+└── README.md
 
 ```
+
+# 🏗 Architecture
+
+The system follows a Clean Layered Architecture designed for:
+
+Scalability
+
+High-performance vector search
+
+Privacy-first biometric processing
+
+Production-ready deployment
+
+```bash
+                          ┌───────────────────────┐
+                          │      Frontend         │
+                          │    (Streamlit UI)     │
+                          └─────────────┬─────────┘
+                                        │ HTTP
+                                        ▼
+                          ┌───────────────────────┐
+                          │       API Layer       │
+                          │     (FastAPI)         │
+                          └─────────────┬─────────┘
+                                        │
+                                        ▼
+                          ┌───────────────────────┐
+                          │  Business Logic Layer │
+                          │     (Services)        │
+                          └─────────────┬─────────┘
+                                        │
+              ┌─────────────────────────┼─────────────────────────┐
+              ▼                         ▼                         ▼
+   ┌───────────────────┐     ┌────────────────────┐     ┌──────────────────┐
+   │     AI Layer      │     │ Infrastructure     │     │   LLM Layer      │
+   │ (Face Recognition)│     │   (Core System)    │     │ (Analytics/RAG)  │
+   └─────────┬─────────┘     └─────────┬──────────┘     └─────────┬────────┘
+             │                           │                          │
+             ▼                           ▼                          ▼
+   Detection + Embedding        FAISS Vector Index            AI Report
+   (In Memory Only)             SQL Database                  Generation
+
+
+```
+# 🔹 1️⃣ AI Layer (Updated)
+
+📁 face_recognition/
+
+Now includes:
+
+detector.py
+
+embedder.py
+
+recognition_pipeline.py
+
+# Responsibility
+```bash
+Image
+   ↓
+Face Detection
+   ↓
+Embedding Extraction
+   ↓
+Vector Search (via Infrastructure Layer)
+
+```
+⚠ Important Update:
+
+No image storage
+
+No raw dataset folder
+
+Embeddings generated in memory only
+
+# 🔹 2️⃣ Infrastructure Layer (New Core Component)
+
+📁 backend/core/
+
+New responsibilities:
+
+FAISS Vector Index Management
+
+Persistent index saving/loading
+
+Shared system dependencies
+
+# Data Separation Strategy
+```bash
+
+This project follows a clear data separation strategy to enhance security, efficiency, and scalability.
+
+| Stores                               | Component         |
+|--------------------------------------|------------------ |
+| Student metadata & attendance records| SQL Database      |
+| Face embeddings only                 | FAISS Index       |
+| FAISS index file                     | Storage Folder    |
+| Not stored                           | Images            |
+```
 ---
+
+### 🔐 Why This Strategy?
+
+- **Security** → Raw images are not stored.
+- **Efficiency** → Only embeddings are indexed for fast similarity search.
+- **Scalability** → Metadata and vector search are separated.
+- **Performance** → FAISS handles high-speed face matching.
+
+# 🔹 3️⃣ Business Logic Layer (Unchanged Conceptually, Cleaner Role)
+
+📁 backend/services/
+
+Handles:
+
+Student Enrollment Workflow
+
+Attendance Registration
+
+Risk Scoring Logic
+
+LLM Reporting Orchestration
+
+This layer connects:
+
+AI ↔ FAISS ↔ SQL ↔ LLM
+
+# 🔹 4️⃣ API Layer
+
+📁 backend/api/
+
+Endpoints:
+
+/students
+
+/attendance
+
+/analytics
+
+Acts strictly as:
+
+Request → Validation → Service Call → Response
+
+# 🔹 5️⃣ LLM & Analytics Layer
+
+📁 llm_module/
+
+Handles:
+
+RAG Pipeline
+
+Prompt Engineering
+
+AI-generated academic risk reports
+
+# 🔁 Updated Core Flows
+🎓 Enrollment Flow
+
+```bash
+Student Image
+   ↓
+Recognition Pipeline
+   ↓
+Embedding Generated
+   ↓
+Save Student Metadata (SQL)
+   ↓
+Add Embedding to FAISS Index
+   ↓
+Persist FAISS Index to Disk
+
+```
+ 📸 Attendance Flow
+```bash
+Live Image
+   ↓
+Recognition Pipeline
+   ↓
+FAISS Nearest Neighbor Search
+   ↓
+Student ID Returned
+   ↓
+Attendance Saved in SQL
+
+```
+📊 Analytics Flow
+```bash
+Attendance Records
+   ↓
+Risk Model Calculation
+   ↓
+LLM Report Generation
+
+```
+
+
+# 🧠 Architectural Improvements From Previous Version
+
+Introduced Infrastructure Layer (Core)
+
+Removed file-based embedding storage
+
+Migrated to FAISS persistent vector index
+
+Centralized recognition pipeline
+
+Clear separation between AI, business logic, and infrastructure
+
 
 # 🛠 Tech Stack
 
@@ -94,63 +333,15 @@ Dashboard
 
 ---
 
-## 📂 Project Structure
+# 🔒 Security & Privacy Update
 
-```bash
-AI-Smart-Attendance-System/
-│
-├── backend/
-│   ├── api/
-│   │   ├── attendance.py
-│   │   ├── students.py
-│   │   └── analytics.py
-│   │
-│   ├── services/
-│   │   ├── attendance_service.py
-│   │   ├── analytics_service.py
-│   │   └── llm_service.py
-│   │
-│   ├── models/
-│   │   ├── student_model.py
-│   │   ├── attendance_model.py
-│   │   └── risk_model.py
-│   │
-│   ├── database.py
-│   ├── config.py
-│   └── main.py
-│
-├── face_recognition/
-│   ├── detector.py
-│   ├── embedder.py
-│   └── matcher.py
-│
-├── llm_module/
-│   ├── rag_pipeline.py
-│   ├── vector_store.py
-│   └── prompts.py
-│
-├── frontend/
-│   └── streamlit_app.py
-│
-├── data/
-│   ├── raw/
-│   └── processed/
-│
-├── docker/
-│   ├── Dockerfile
-│   └── docker-compose.yml
-│
-├── requirements.txt
-├── .env
-└── README.md
-```
----
+No biometric image storage
 
-# 🔐 Security
+Only mathematical embeddings stored
 
-- Embeddings stored instead of raw images  
-- Role-based access control  
-- Encrypted database storage  
+Embeddings cannot reconstruct original face
+
+System designed for privacy compliance 
 
 ---
 

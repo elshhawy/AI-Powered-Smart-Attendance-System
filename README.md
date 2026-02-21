@@ -181,7 +181,7 @@ AI-Powered-Smart-Attendance-System/
 │   ─────────────          ────────────────────    │
 │   admins                 face_embeddings         │
 │   organizations          (512-dim vectors,       │
-│   students               keyed by student_id)    │
+│   students               keyed by student_id)   │
 │   attendance             sub-second search       │
 │                                                  │
 │   4 tables only — no users/roles/employees       │

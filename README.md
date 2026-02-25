@@ -1,355 +1,457 @@
-# 🎓 AI-Powered Smart Attendance System
+# 🎯 AI-Powered Smart Attendance System
 
-🚀 An intelligent attendance automation platform powered by Computer Vision, Machine Learning, and LLM-based academic analytics.
+<div align="center">
 
-Developed under the **Digital Egypt Pioneers Initiative (DEPI)**  
-Managed by **EYouth**  
-Supervised by **Eng. Alaa Samir**
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
----
+**A production-ready, AI-driven attendance system using real-time face recognition and a RAG-powered chatbot — built for universities and organisations where a single admin operates the system and students are tracked passively by camera.**
 
-## 👥 Team
+[Features](#-features) • [Architecture](#-architecture) • [Project Structure](#-project-structure) • [Getting Started](#-getting-started) • [API Docs](#-api-documentation) • [Tech Stack](#-tech-stack)
 
-- Abdelrahman ElSayed Elshhawy  
-- Mohamed Khairy Eid Elzeblawy  
-- Rouaa Sameh Elbadrawy  
-- Farida Abdelhalim Mohamed Abdelaal  
-- Wasim Ebada Mohamed Abouajaga  
-- Mostafa AbdelSadek Mohamed Zayed 
+</div>
 
 ---
 
-# 📌 Overview
+## 🏢 Project Context
 
-This system automates student attendance using real-time face recognition and transforms attendance records into actionable academic insights using predictive analytics and AI-generated reports.
+> Developed under the **Digital Egypt Pioneers Initiative (DEPI)** — Managed by **EYouth** — Supervised by **Eng. Alaa Samir**
 
-It eliminates manual processes, prevents proxy attendance, and enables data-driven academic decision-making.
+### 👥 Team Members
 
----
-
-# ⚙️ Core Features
-
-### 🟢 Smart Face Recognition
-- Real-time face detection (RetinaFace)
-- Face embedding extraction (ArcFace)
-- Cosine similarity identity matching
-- Automatic attendance logging
-- Duplicate prevention
-
-### 🟡 Academic Analytics
-- Attendance percentage tracking
-- Consecutive absence monitoring
-- Student ranking system
-- Risk prediction (Random Forest)
-- Trend visualization
-
-### 🔴 AI Academic Assistant
-- Natural language queries
-- Automated warning letter generation
-- Department performance reports
-- RAG-powered policy integration
+| Name |
+|------|
+| Abdelrahman Elsayed Elshhawy |
+| Mohamed Khairy Eid Elzeblawy |
+| Rouaa Sameh Elbadrawy |
+| Farida Abdelhalim Mohamed Abdelaal |
+| Wasim Ebada Mohamed Abouajaga |
+| Mostafa Abdelsadek Mohamed Zayed |
 
 ---
-## 📂 Project Structure
 
-```bash
-AI-Smart-Attendance-System/
+## ✨ Features
+
+| Feature | Description |
+|--------|-------------|
+| 👁️ **Face Recognition** | Real-time student identification using ArcFace 512-dim embeddings |
+| 🛡️ **Anti-Spoofing** | Liveness detection to prevent photo/video attacks |
+| 🤖 **RAG Chatbot** | Admin asks questions in Arabic or English — powered by LLaMA 3 + live PostgreSQL context |
+| 📊 **Smart Reports** | Export attendance reports as PDF or Excel |
+| 🔑 **Admin-Only Auth** | Single admin account — JWT for browser sessions, static API key for the camera kiosk |
+| 🔔 **Notifications** | Automated email alerts to admin for late arrivals |
+| 🔐 **JWT Security** | Secure token-based authentication with refresh tokens |
+| 🐳 **Dockerized** | One command to run the entire stack |
+
+---
+## 📁 Project Structure
+
+```
+AI-Powered-Smart-Attendance-System/
 │
-├── backend/
-│   ├── api/                        # FastAPI route handlers
-│   │   ├── attendance.py
-│   │   ├── students.py
-│   │   └── analytics.py
+├── src/
+│   ├── api/v1/endpoints/
+│   │   ├── auth.py              # Login, logout, token refresh
+│   │   ├── attendance.py        # Mark (kiosk key), view, query attendance
+│   │   ├── students.py          # Student CRUD + face registration
+│   │   ├── reports.py           # PDF / Excel export
+│   │   └── chat.py              # Admin chatbot endpoint
 │   │
-│   ├── services/                   # Business logic layer
+│   ├── services/
 │   │   ├── attendance_service.py
-│   │   ├── analytics_service.py
-│   │   └── llm_service.py
+│   │   ├── student_service.py
+│   │   ├── report_service.py
+│   │   ├── notification_service.py
+│   │   └── export_service.py
 │   │
-│   ├── models/                     # SQLAlchemy database models
-│   │   ├── student_model.py
-│   │   ├── attendance_model.py
-│   │   └── risk_model.py
+│   ├── ai/
+│   │   ├── detector.py          # RetinaFace — face detection
+│   │   ├── embedder.py          # ArcFace (buffalo_l) — 512-dim embedding
+│   │   ├── anti_spoofing.py     # Silent Face — liveness detection
+│   │   └── recognition_pipeline.py
 │   │
-│   ├── core/                       # Infrastructure layer
-│   │   ├── vector_index.py         # FAISS manager (persistent index)
-│   │   └── dependencies.py         # Shared system instances
+│   ├── llm/
+│   │   ├── rag_pipeline.py
+│   │   ├── context_builder.py
+│   │   └── prompts.py
 │   │
-│   ├── database.py
-│   ├── config.py
+│   ├── core/
+│   │   ├── config.py
+│   │   ├── vector_index.py      # FAISS management
+│   │   └── security.py          # JWT + bcrypt + get_current_admin() + verify_kiosk_key()
+│   │
+│   ├── models/                  # SQLAlchemy ORM models
+│   │   ├── admin.py             # The only login account type
+│   │   ├── organization.py      # Groups students by faculty / class
+│   │   ├── student.py           # No user_id, no password — data record only
+│   │   └── attendance.py        # One record per student per day
+│   │
+│   ├── schemas/                 # Pydantic schemas
+│   ├── db/                      # Session + repositories
 │   └── main.py
 │
-├── face_recognition/               # AI Layer
-│   ├── detector.py                 # Face detection model
-│   ├── embedder.py                 # Face embedding model
-│   └── recognition_pipeline.py     # Detection + Embedding + Matching
+├── view/
+│   ├── app.py
+│   └── pages/
+│       ├── dashboard.py
+│       ├── students.py
+│       ├── camera.py
+│       ├── reports.py
+│       └── chatbot.py
 │
-├── llm_module/                     # LLM & RAG layer
-│   ├── rag_pipeline.py
-│   └── prompts.py
+├── scripts/
+│   └── create_admin.py          # CLI — creates the first admin (no public signup endpoint)
 │
-├── storage/                        # Persistent system artifacts
-│   └── faiss_index/                # Saved FAISS index files
-│
-├── frontend/
-│   └── streamlit_app.py
+├── tests/
+│   ├── unit/
+│   └── integration/
 │
 ├── docker/
 │   ├── Dockerfile
-│   └── docker-compose.yml
+│   ├── docker-compose.yml
+│   └── docker-compose.prod.yml
 │
+├── migrations/                  # Alembic
 ├── requirements.txt
-├── .env
+├── .env.example
 └── README.md
-
 ```
 
-# 🏗 Architecture
+## 🏛️ Architecture
 
-The system follows a Clean Layered Architecture designed for:
-
-Scalability
-
-High-performance vector search
-
-Privacy-first biometric processing
-
-Production-ready deployment
-
-```bash
-                          ┌───────────────────────┐
-                          │      Frontend         │
-                          │    (Streamlit UI)     │
-                          └─────────────┬─────────┘
-                                        │ HTTP
-                                        ▼
-                          ┌───────────────────────┐
-                          │       API Layer       │
-                          │     (FastAPI)         │
-                          └─────────────┬─────────┘
-                                        │
-                                        ▼
-                          ┌───────────────────────┐
-                          │  Business Logic Layer │
-                          │     (Services)        │
-                          └─────────────┬─────────┘
-                                        │
-              ┌─────────────────────────┼─────────────────────────┐
-              ▼                         ▼                         ▼
-   ┌───────────────────┐     ┌────────────────────┐     ┌──────────────────┐
-   │     AI Layer      │     │ Infrastructure     │     │   LLM Layer      │
-   │ (Face Recognition)│     │   (Core System)    │     │ (Analytics/RAG)  │
-   └─────────┬─────────┘     └─────────┬──────────┘     └─────────┬────────┘
-             │                           │                          │
-             ▼                           ▼                          ▼
-   Detection + Embedding        FAISS Vector Index            AI Report
-   (In Memory Only)             SQL Database                  Generation
-
+### High-Level System Architecture
 
 ```
-# 🔹 1️⃣ AI Layer (Updated)
+┌──────────────────────────────────────────────────┐
+│                  CLIENT LAYER                    │
+│                                                  │
+│         Streamlit Frontend (5 Pages)             │
+│  Dashboard │ Students │ Camera │ Reports │ Chat  │
+│                                                  │
+│              Admin browser only                  │
+└──────────┬───────────────────────────┬───────────┘
+           │ JWT (admin pages)         │ X-API-Key (camera kiosk)
+           ▼                           ▼
+┌──────────────────────────────────────────────────┐
+│              API LAYER  (FastAPI)                │
+│                                                  │
+│   /auth   /attendance   /students   /reports     │
+│                   /chat                          │
+│                                                  │
+│   Admin endpoints  → verify JWT                  │
+│   Camera endpoint  → verify kiosk API key        │
+└──────────────────────┬───────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────┐
+│          BUSINESS LOGIC LAYER (Services)         │
+│                                                  │
+│  AttendanceService │ StudentService              │
+│  ReportService     │ NotificationService         │
+│  ExportService                                   │
+└────────┬──────────────────────────┬──────────────┘
+         │                          │
+         ▼                          ▼
+┌─────────────────┐      ┌──────────────────────────┐
+│   AI PIPELINE   │      │      LLM / RAG PIPELINE  │
+│                 │      │                          │
+│  1. RetinaFace  │      │  Question                │
+│     (Detect)    │      │     → Context Builder    │
+│                 │      │     → Prompt Builder     │
+│  2. Anti-Spoof  │      │     → LLM Inference      │
+│   (Liveness)    │      │     → Answer to Admin    │
+│                 │      │                          │
+│  3. ArcFace     │      │  (LLaMA 3 via Groq)      │
+│    (Embed)      │      └─────────────┬────────────┘
+│                 │                    │
+│  4. FAISS       │                    │
+│   (Search)      │                    │
+└────────┬────────┘                    │
+         │                             │
+         └──────────────┬──────────────┘
+                        ▼
+┌──────────────────────────────────────────────────┐
+│                  DATA LAYER                      │
+│                                                  │
+│   PostgreSQL DB          FAISS Vector Index      │
+│   ─────────────          ────────────────────    │
+│   admins                 face_embeddings         │
+│   organizations          (512-dim vectors,       │
+│   students               keyed by student_id)    │
+│   attendance             sub-second search       │
+│                                                  │
+│   4 tables only — no users/roles/employees       │
+│                                                  │
+│          Repository Layer (Data Access)          │
+└──────────────────────────────────────────────────┘
+```
 
-📁 face_recognition/
+> **Note:** Both the AI Pipeline and LLM/RAG Pipeline sit at the same Business Logic level.
+> They are independent components — both read from the Data Layer but serve different purposes:
+> - **AI Pipeline** → identifies *who* is present via face matching
+> - **LLM Pipeline** → answers *questions* about attendance data in natural language
 
-Now includes:
-
-detector.py
-
-embedder.py
-
-recognition_pipeline.py
-
-# Responsibility
-```bash
-Image
-   ↓
-Face Detection
-   ↓
-Embedding Extraction
-   ↓
-Vector Search (via Infrastructure Layer)
+### Request Lifecycle — Mark Attendance
 
 ```
-⚠ Important Update:
-
-No image storage
-
-No raw dataset folder
-
-Embeddings generated in memory only
-
-# 🔹 2️⃣ Infrastructure Layer (New Core Component)
-
-📁 backend/core/
-
-New responsibilities:
-
-FAISS Vector Index Management
-
-Persistent index saving/loading
-
-Shared system dependencies
-
-# Data Separation Strategy
-```bash
-
-This project follows a clear data separation strategy to enhance security, efficiency, and scalability.
-
-| Stores                               | Component         |
-|--------------------------------------|------------------ |
-| Student metadata & attendance records| SQL Database      |
-| Face embeddings only                 | FAISS Index       |
-| FAISS index file                     | Storage Folder    |
-| Not stored                           | Images            |
+Camera Frame (Streamlit camera page or physical kiosk)
+        │
+        ▼
+POST /api/v1/attendance/mark
+  Header: X-API-Key: <KIOSK_API_KEY>    ← static key, not a JWT
+        │
+        ▼
+verify_kiosk_key()
+        │
+        ├─── ❌ Unauthorized ──────────────────────► 401
+        │
+        ▼
+AttendanceService.mark(image)
+        │
+        ├──► 1. FaceDetector.detect()       → bounding box
+        ├──► 2. AntiSpoofing.is_real_face() → ❌ 400 if spoof
+        ├──► 3. FaceEmbedder.embed()        → 512-dim vector
+        ├──► 4. VectorIndex.search()        → (student_id, confidence)
+        ├──► 5. confidence < threshold?     → ❌ 404 FaceNotFound
+        ├──► 6. check_duplicate(today)?     → ✅ 200 already_marked (no duplicate)
+        ├──► 7. AttendanceRepository.create()
+        ├──► 8. is_late()? → NotificationService.send_alert()
+        │
+        └──► ✅ 200 OK: { student_name, status, confidence, timestamp }
 ```
+
 ---
 
-### 🔐 Why This Strategy?
+### Role & Permission Matrix
 
-- **Security** → Raw images are not stored.
-- **Efficiency** → Only embeddings are indexed for fast similarity search.
-- **Scalability** → Metadata and vector search are separated.
-- **Performance** → FAISS handles high-speed face matching.
+```
+┌──────────────────────────────────────────────────────┐
+│               AUTHENTICATION MODEL                   │
+├──────────────────┬─────────────────┬─────────────────┤
+│  Caller          │  Credential     │  Access         │
+├──────────────────┼─────────────────┼─────────────────┤
+│ Admin (browser)  │  JWT token      │  All endpoints  │
+│                  │  (30 min)       │  except /mark   │
+├──────────────────┼─────────────────┼─────────────────┤
+│ Camera kiosk     │  X-API-Key      │  /attendance/   │
+│ (machine)        │  (static)       │  mark only      │
+├──────────────────┼─────────────────┼─────────────────┤
+│ Student          │  — none —       │  Nothing.       │
+│                  │                 │  Not a user.    │
+└──────────────────┴─────────────────┴─────────────────┘
 
-# 🔹 3️⃣ Business Logic Layer (Unchanged Conceptually, Cleaner Role)
+Admin can do everything:
+  ✅ Register students (form + face photos)
+  ✅ Delete students (cascades to FAISS)
+  ✅ View all attendance records
+  ✅ Generate and export PDF / Excel reports
+  ✅ Use the AI chatbot (Arabic / English)
+  ✅ Manage organisations
+```
 
-📁 backend/services/
+# 1️⃣ Client Layer (Streamlit Frontend)
 
-Handles:
+Responsible for:
 
-Student Enrollment Workflow
+Capturing camera frames
 
-Attendance Registration
+Uploading registration photos for face enrollment
 
-Risk Scoring Logic
+Displaying attendance status
 
-LLM Reporting Orchestration
+Viewing reports
 
-This layer connects:
+Interacting with AI chatbot
 
-AI ↔ FAISS ↔ SQL ↔ LLM
+This layer never directly communicates with the database or AI models.
+It only communicates with the API layer.
 
-# 🔹 4️⃣ API Layer
 
-📁 backend/api/
+# 2️⃣ API Layer (FastAPI)
 
-Endpoints:
+Acts as the gateway of the system.
 
-/students
+Responsibilities:
+
+Request validation
+
+JWT verification (all admin endpoints)
+
+Kiosk API key verification (attendance marking endpoint)
+
+Routing requests to business services
+
+Endpoints include:
+
+/auth
 
 /attendance
 
-/analytics
+/students
 
-Acts strictly as:
+/reports
 
-Request → Validation → Service Call → Response
+/chat
 
-# 🔹 5️⃣ LLM & Analytics Layer
+Swagger documentation is automatically available at:
 
-📁 llm_module/
-
-Handles:
-
-RAG Pipeline
-
-Prompt Engineering
-
-AI-generated academic risk reports
-
-# 🔁 Updated Core Flows
-🎓 Enrollment Flow
-
-```bash
-Student Image
-   ↓
-Recognition Pipeline
-   ↓
-Embedding Generated
-   ↓
-Save Student Metadata (SQL)
-   ↓
-Add Embedding to FAISS Index
-   ↓
-Persist FAISS Index to Disk
-
-```
- 📸 Attendance Flow
-```bash
-Live Image
-   ↓
-Recognition Pipeline
-   ↓
-FAISS Nearest Neighbor Search
-   ↓
-Student ID Returned
-   ↓
-Attendance Saved in SQL
-
-```
-📊 Analytics Flow
-```bash
-Attendance Records
-   ↓
-Risk Model Calculation
-   ↓
-LLM Report Generation
-
-```
+http://localhost:8000/docs
 
 
-# 🧠 Architectural Improvements From Previous Version
+# 3️⃣ Business Logic Layer (Services)
 
-Introduced Infrastructure Layer (Core)
+This is the brain of the application.
 
-Removed file-based embedding storage
+It orchestrates:
 
-Migrated to FAISS persistent vector index
+AI Pipeline
 
-Centralized recognition pipeline
+Database operations
 
-Clear separation between AI, business logic, and infrastructure
+FAISS index
 
+Notification services
 
-# 🛠 Tech Stack
+LLM pipeline
 
-**Computer Vision:** OpenCV, InsightFace (RetinaFace + ArcFace)  
-**Backend:** FastAPI  
-**Database:** PostgreSQL, FAISS  
-**Machine Learning:** Scikit-learn, Pandas, NumPy  
-**LLM & NLP:** SentenceTransformers, RAG, OpenAI/Mistral  
-**Frontend:** Streamlit / React  
-**Deployment:** Docker  
+Examples:
+
+AttendanceService:
+
+Detect face
+
+Check liveness
+
+Generate embedding
+
+Search FAISS
+
+Check for duplicate record today
+
+Validate confidence threshold
+
+Store attendance record
+
+Trigger late notification
+
+StudentService:
+
+Create DB record first (to get the auto-generated student_id)
+
+Enroll face photos in FAISS using that student_id
+
+Roll back DB record if FAISS enrollment fails
+
+# 4️⃣ AI Pipeline
+
+Steps executed during attendance:
+
+Image → Detect Face → Check Liveness → Extract Embedding → Search FAISS → Identify Student
+
+The embedding is a 512-dimensional numerical vector generated by ArcFace (buffalo_l), normalised to unit length before storage and search.
+
+FAISS performs nearest-neighbor similarity search using IndexFlatL2.
+
+# 5️⃣ LLM / RAG Pipeline
+
+This module handles intelligent queries from the admin.
+
+Steps:
+
+Question → Detect Intent → Query PostgreSQL → Format as plain text → Construct Prompt → LLM Inference → Structured Response
+
+Supported intent types:
+
+Absences — "من الغائبون اليوم؟" / "who was absent today?"
+
+Late arrivals — "من تأخر؟" / "who arrived late?"
+
+Attendance summary — "ما نسبة الحضور؟" / "what is the attendance rate?"
+
+At-risk students — "من في خطر الرسوب؟" / "which students are at risk?"
+
+Configured via environment variables.
+
+# 6️⃣ Data Layer
+
+Two independent storage systems:
+
+PostgreSQL — 4 tables only:
+
+Admins (the only login accounts — no roles, no employees, no student accounts)
+
+Organizations
+
+Students (no user_id, no password — purely a data record identified by face)
+
+Attendance records
+
+FAISS Vector Index:
+
+Stores 512-dimension face embeddings keyed by student_id
+
+Performs sub-second similarity search
+
+The system follows strict data separation:
+
+Images → NOT stored
+Embeddings → Stored in FAISS (keyed by student_id)
+Metadata → Stored in PostgreSQL
 
 ---
 
-# 📊 Key Outcomes
 
-✔ ≥95% face recognition accuracy  
-✔ Automated attendance workflow  
-✔ Early detection of at-risk students  
-✔ AI-generated academic reports  
-✔ Modular & scalable architecture  
+## 🔐 Security
 
----
-
-# 🔒 Security & Privacy Update
-
-No biometric image storage
-
-Only mathematical embeddings stored
-
-Embeddings cannot reconstruct original face
-
-System designed for privacy compliance 
+- Admin passwords hashed with **bcrypt**
+- **JWT** access + refresh tokens
+- Camera kiosk authenticates with a static **API key** (`X-API-Key` header) — no JWT issued to machines
+- No public signup endpoint — admin accounts created via a CLI script on the server
+- Anti-spoofing on every attendance request
+- Face embeddings stored as vectors — **no raw images saved**
+- `.env` never committed (enforced by `.gitignore`)
 
 ---
 
-# 🌟 Vision
+## 📦 Tech Stack
 
-Transform traditional attendance systems into intelligent academic intelligence platforms by combining Vision AI, Predictive Modeling, and Large Language Models in one unified system.
+| Layer | Technology |
+|-------|-----------|
+| Backend API | FastAPI, Uvicorn |
+| Frontend | Streamlit |
+| Database | PostgreSQL + SQLAlchemy + Alembic |
+| Face AI | OpenCV, RetinaFace, ArcFace (InsightFace buffalo_l) |
+| Liveness | Silent Face Anti-Spoofing |
+| Vector DB | FAISS |
+| LLM / RAG | LLaMA 3 8B via Groq Free API |
+| Auth | JWT (python-jose), bcrypt |
+| Notifications | smtplib (Gmail SMTP) |
+| Export | ReportLab (PDF), openpyxl (Excel) |
+| DevOps | Docker, Docker Compose, GitHub Actions |
+| Testing | pytest, httpx |
 
 ---
 
-📌 Developed for professional smart attendance management, leveraging AI-driven face recognition, analytics, and automated reporting to streamline operations and enhance efficiency.
+## 🗺️ Roadmap
 
+- [ ] Core face recognition pipeline
+- [ ] Admin-only authentication (JWT + kiosk API key)
+- [ ] RAG-powered chatbot (Arabic + English)
+- [ ] PDF & Excel export
+- [ ] Docker deployment
+- [ ] Real-time WebSocket attendance stream
+- [ ] Multi-camera support
+- [ ] Automatic daily absence marking (scheduled job)
+- [ ] HR systems integration (SAP, Workday)
+
+---
+
+<div align="center">
+
+⭐ **If this project helped you, please give it a star!** ⭐
+
+</div>

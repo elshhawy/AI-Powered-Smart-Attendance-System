@@ -40,7 +40,7 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     admin = repo.get_by_email(credentials.email)
 
     # Dummy hash — used when admin not found to prevent timing attacks
-    dummy_hash = "$2b$12$dummyhashfortimingattackpreventiononlyXXXXXXXXXXX"
+    dummy_hash = "$2b$12$KIXbMHjwrVkKQzX9X9X9XeWQKIXbMHjwrVkKQzX9X9X9Xe"
 
     password_to_check = admin.hashed_password if admin else dummy_hash
 

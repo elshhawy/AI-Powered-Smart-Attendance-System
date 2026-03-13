@@ -86,8 +86,10 @@ class RecognitionPipeline:
             return RecognitionFailure("Spoof attempt detected. Please use a real face.")
 
         # ── Step 3: Get embedding ─────────────────────────────────────────────
+        # We pass the full image (not face_crop) because the embedder uses
+        # InsightFace internally which does its own detection on the full image.
         try:
-            embedding = self.embedder.get_embedding(face_crop)
+            embedding = self.embedder.get_embedding(image)
         except ValueError as e:
             return RecognitionFailure(f"Could not extract face embedding: {e}")
 
@@ -126,7 +128,9 @@ class RecognitionPipeline:
                 "Spoof detected during enrollment. Please use a real face photo."
             )
 
-        return self.embedder.get_embedding(face_crop)
+        # We pass the full image (not face_crop) because the embedder uses
+        # InsightFace internally which does its own detection on the full image.
+        return self.embedder.get_embedding(image)
 
     # ── Private helpers ───────────────────────────────────────────────────────
 

@@ -48,8 +48,10 @@ class AntiSpoofing:
             True  if the face passes the liveness check
             False if the face is detected as a spoof attempt
         """
-        score = self._get_liveness_score(face_crop)
-        return score >= self.LIVENESS_THRESHOLD
+        # score = self._get_liveness_score(face_crop)
+        # return score >= self.LIVENESS_THRESHOLD
+        # Anti-spoofing disabled until model weights are added in Phase 7
+        return True
 
     def _get_liveness_score(self, face_crop: np.ndarray) -> float:
         """

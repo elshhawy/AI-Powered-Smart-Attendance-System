@@ -1,6 +1,5 @@
 # src/ai/embedder.py
 import numpy as np
-import insightface
 from insightface.app import FaceAnalysis
 
 
@@ -8,16 +7,21 @@ class FaceEmbedder:
     """
     Wrapper around ArcFace (InsightFace buffalo_l model).
 
-    Converts a cropped face image into a 512-dimensional embedding.
+    Converts a face image into a 512-dimensional embedding.
     The embedding is a numeric "fingerprint" of the face.
 
-    Same person  → embeddings are close to each other (low L2 distance)
+    Same person      → embeddings are close to each other (low L2 distance)
     Different people → embeddings are far apart (high L2 distance)
 
     Why buffalo_l?
         - Best accuracy in the InsightFace model zoo
         - 512-dim embeddings (good balance of accuracy vs storage)
         - Works well across different lighting and angles
+
+    Important:
+        This embedder receives the FULL image (not a cropped face).
+        InsightFace handles face detection internally before extracting
+        the embedding. Do NOT resize or crop before passing here.
     """
 
     def __init__(self):
@@ -36,35 +40,35 @@ class FaceEmbedder:
         # InsightFace. (640, 640) is the recommended size for buffalo_l.
         self.app.prepare(ctx_id=-1, det_size=(640, 640))
 
-    def get_embedding(self, face_crop: np.ndarray) -> np.ndarray:
+    def get_embedding(self, image: np.ndarray) -> np.ndarray:
         """
-        Convert a cropped face image to a 512-dim embedding.
+        Convert a face image to a 512-dim embedding.
 
         Args:
-            face_crop: BGR image of the face (output from FaceDetector)
+            image: full BGR image as numpy array (from OpenCV).
+                   InsightFace handles detection internally.
+                   Do NOT pass a cropped face — pass the full image.
 
         Returns:
             Normalized 512-dimensional numpy array (float32)
 
         Raises:
-            ValueError: if no face is detected in the crop
-                        (shouldn't happen since detector already ran,
-                         but we guard against edge cases)
+            ValueError: if no face is detected in the image
 
         Why normalize?
             Normalization makes all embeddings the same length (magnitude = 1).
             This makes L2 distance comparisons more reliable and consistent
             regardless of the original image brightness or contrast.
         """
-        faces = self.app.get(face_crop)
+        faces = self.app.get(image)
 
         if not faces:
             raise ValueError(
-                "ArcFace could not extract embedding from the face crop. "
-                "The crop may be too small or blurry."
+                "ArcFace could not extract embedding from the image. "
+                "Make sure the image contains a clear, visible face."
             )
 
-        # .embedding is a 512-dim numpy array
+        # Use the first detected face
         embedding = faces[0].embedding
 
         # Normalize to unit length

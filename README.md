@@ -402,6 +402,59 @@ Images → NOT stored
 Embeddings → Stored in FAISS (keyed by student_id)
 Metadata → Stored in PostgreSQL
 
+FAISS performs nearest-neighbor similarity search using IndexFlatL2.
+
+# 5️⃣ LLM / RAG Pipeline
+
+This module handles intelligent queries.
+
+Steps:
+
+Question → Build Context from DB → Construct Prompt → LLM Inference → Structured Response
+
+Supported Free & Open LLM Options:
+
+LLaMA 3 (via Groq Free API)
+
+Mistral 7B (via free API tier)
+
+OpenRouter Free Tier Models
+
+Ollama (Local LLaMA / Mistral – No API cost)
+
+These options allow the system to run completely free in development mode or low-cost in production.
+
+Configured via environment variables.
+
+# 6️⃣ Data Layer
+
+Two independent storage systems:
+
+PostgreSQL:
+
+Users
+
+Roles
+
+Students
+
+Employees
+
+Attendance records
+
+Organizations
+
+FAISS Vector Index:
+
+Stores 512-dimension face embeddings
+
+Performs sub-second similarity search
+
+The system follows strict data separation:
+
+Images → NOT stored
+Embeddings → Stored in FAISS
+Metadata → Stored in PostgreSQL
 ---
 
 

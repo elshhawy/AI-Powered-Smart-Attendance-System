@@ -41,22 +41,13 @@ class RecognitionPipeline:
     Step 2 — AntiSpoofing:   verify the face is real, not a photo
     Step 3 — FaceEmbedder:   convert face to 512-dim embedding
     Step 4 — VectorIndex:    search for the closest match in FAISS
-
-    Usage:
-        pipeline = RecognitionPipeline()
-        result = pipeline.recognize(image)
-
-        if isinstance(result, RecognitionResult):
-            # success — mark attendance for result.student_id
-        elif isinstance(result, RecognitionFailure):
-            # failed — log result.reason
     """
 
     def __init__(self):
-        self.detector  = FaceDetector()
-        self.spoof     = AntiSpoofing()
-        self.embedder  = FaceEmbedder()
-        self.index     = VectorIndex(
+        self.detector = FaceDetector()
+        self.spoof    = AntiSpoofing()
+        self.embedder = FaceEmbedder()
+        self.index    = VectorIndex(
             index_path=settings.FAISS_INDEX_PATH,
             id_map_path=settings.FAISS_ID_MAP_PATH,
         )
@@ -86,15 +77,17 @@ class RecognitionPipeline:
             return RecognitionFailure("Spoof attempt detected. Please use a real face.")
 
         # ── Step 3: Get embedding ─────────────────────────────────────────────
-        # We pass the full image (not face_crop) because the embedder uses
-        # InsightFace internally which does its own detection on the full image.
+        # We pass the full image (not face_crop) because InsightFace
+        # does its own detection internally on the full image.
         try:
             embedding = self.embedder.get_embedding(image)
         except ValueError as e:
             return RecognitionFailure(f"Could not extract face embedding: {e}")
 
         # ── Step 4: Search FAISS ──────────────────────────────────────────────
-        student_id = self.index.search(
+        # search() returns (student_id, distance) in one call.
+        # We use the distance directly for confidence — no second FAISS search.
+        student_id, distance = self.index.search(
             embedding=embedding,
             threshold=settings.SIMILARITY_THRESHOLD,
         )
@@ -102,9 +95,13 @@ class RecognitionPipeline:
         if student_id is None:
             return RecognitionFailure("Face not recognised. Student may not be registered.")
 
-        # Convert L2 distance to a 0.0-1.0 confidence score
-        # Lower distance = higher confidence
-        confidence = self._distance_to_confidence(embedding)
+        # Convert L2 distance to a 0.0-1.0 confidence score.
+        # Lower distance = more similar = higher confidence.
+        # Formula: confidence = 1 - (distance / threshold), clipped to [0, 1]
+        confidence = round(
+            float(np.clip(1.0 - (distance / settings.SIMILARITY_THRESHOLD), 0.0, 1.0)),
+            4
+        )
 
         return RecognitionResult(student_id=student_id, confidence=confidence)
 
@@ -128,29 +125,5 @@ class RecognitionPipeline:
                 "Spoof detected during enrollment. Please use a real face photo."
             )
 
-        # We pass the full image (not face_crop) because the embedder uses
-        # InsightFace internally which does its own detection on the full image.
+        # Pass the full image — InsightFace handles detection internally.
         return self.embedder.get_embedding(image)
-
-    # ── Private helpers ───────────────────────────────────────────────────────
-
-    def _distance_to_confidence(self, embedding: np.ndarray) -> float:
-        """
-        Convert L2 distance to a confidence score between 0.0 and 1.0.
-
-        FAISS returns distance (lower = more similar).
-        We want confidence (higher = more certain).
-
-        Formula: confidence = 1 - (distance / threshold)
-        Clipped to [0.0, 1.0] range.
-
-        Example:
-            distance=0.1, threshold=0.8 → confidence = 0.875
-            distance=0.7, threshold=0.8 → confidence = 0.125
-        """
-        distances, _ = self.index.index.search(
-            embedding.astype(np.float32).reshape(1, 512), k=1
-        )
-        distance = float(distances[0][0])
-        confidence = 1.0 - (distance / settings.SIMILARITY_THRESHOLD)
-        return round(float(np.clip(confidence, 0.0, 1.0)), 4)

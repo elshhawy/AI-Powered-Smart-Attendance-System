@@ -12,53 +12,23 @@ class Attendance(Base):
 
     student_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("students.id"),  # Links to the students table.
+        ForeignKey("students.id", ondelete="CASCADE"),  
         nullable=False,
-        index=True   # Indexed because the most common query is:
-                     # "give me all attendance records for student X"
-                     # Without this index, PostgreSQL scans the whole table.
+        index=True
     )
 
-    date: Mapped[date] = mapped_column(
-        Date,
-        nullable=False,
-        index=True   # Also indexed because we query by date a lot:
-                     # "give me all records for today"
-    )
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
 
-    timestamp: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True
-        # WHY nullable? Because there are two kinds of attendance records:
-        #   1. Camera-detected: timestamp = when they walked past the camera
-        #   2. Manually entered (absent): timestamp = NULL because they never arrived
-        # Both kinds share this same table. date is always set, timestamp is sometimes NULL.
-    )
+    timestamp: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    status: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False
-        # Only three possible values: "present", "late", "absent"
-        # "present" = arrived before the late threshold
-        # "late"    = arrived after the late threshold
-        # "absent"  = never arrived (manually entered or via daily job)
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
 
     is_late: Mapped[bool] = mapped_column(Boolean, default=False)
-    # True when status is "late". Stored separately so you can query
-    # "count of late arrivals" without string matching on status.
 
-    confidence: Mapped[float | None] = mapped_column(
-        Float,
-        nullable=True
-        # The confidence score from FAISS (0.0 to 1.0).
-        # NULL for manually-entered absent records — no AI was involved.
-        # Example value: 0.94 means "94% certain this is the right person"
-    )
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    # Relationship:
     student: Mapped["Student"] = relationship(
         "Student",
-        back_populates="attendance_records"
-        # Lets you write: record.student → gives you the Student object
+        back_populates="attendance_records",
+        passive_deletes=True,  
     )

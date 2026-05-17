@@ -18,7 +18,6 @@ from jose import JWTError
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-
 @router.post("/login", response_model=TokenResponse)
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     """
@@ -29,8 +28,6 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 
     Never say "email not found" or "wrong password" separately.
     Differentiating them tells attackers which emails exist in the system.
-    An attacker could enumerate all admin emails by trying random ones
-    and watching which error they get.
 
     We also call verify_password() EVEN IF the admin is not found.
     This is called a "dummy verification" — it prevents timing attacks
@@ -39,10 +36,13 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     repo  = AdminRepository(db)
     admin = repo.get_by_email(credentials.email)
 
-    # Dummy hash — used when admin not found to prevent timing attacks
-    dummy_hash = "$2b$12$KIXbMHjwrVkKQzX9X9X9XeWQKIXbMHjwrVkKQzX9X9X9Xe"
+    # ✅ Valid bcrypt hash — exactly 60 chars, correct format
+    # This is a pre-generated hash of a random string — never matches any real password
+    # Its only job is to make verify_password() take the same time whether
+    # the admin exists or not (prevents timing attacks)
+    DUMMY_HASH = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/lewohPNk2GL5tF3se"
 
-    password_to_check = admin.hashed_password if admin else dummy_hash
+    password_to_check = admin.hashed_password if admin else DUMMY_HASH
 
     if not admin or not verify_password(credentials.password, password_to_check):
         raise HTTPException(
@@ -62,9 +62,8 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         "token_type":    "bearer",
         "admin_name":    admin.full_name,
     }
-    
-    
-    
+
+
 @router.post("/refresh")
 def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     """
@@ -101,8 +100,3 @@ def get_me(admin: Admin = Depends(get_current_admin)):
     No db parameter needed — get_current_admin already loaded the admin.
     """
     return admin
-  
-  
-
-
-

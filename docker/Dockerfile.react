@@ -1,0 +1,14 @@
+# docker/Dockerfile.react
+FROM node:20-alpine
+
+WORKDIR /app/view_react
+
+COPY view_react/package.json .
+
+RUN npm install
+
+COPY view_react/ .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

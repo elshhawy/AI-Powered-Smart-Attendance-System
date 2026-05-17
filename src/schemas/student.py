@@ -33,8 +33,7 @@ class StudentResponse(BaseModel):
     organization_id: int
     enrollment_date: date
 
-    class Config:
-        from_attributes = True  # allows converting SQLAlchemy model to this schema
+    model_config = {"from_attributes": True}  # ✅ Pydantic v2 style
 
 
 class StudentListResponse(BaseModel):
@@ -47,4 +46,4 @@ class EnrollmentResponse(BaseModel):
     """Returned after successfully enrolling a student."""
     student: StudentResponse
     message: str = "Student enrolled successfully"
-    faces_in_index: int  # total faces in FAISS after enrollment
+    faces_in_index: int

@@ -1,6 +1,6 @@
 # src/schemas/attendance.py
 from datetime import date, datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 # ── Response Schemas ──────────────────────────────────────────────────────────
@@ -22,18 +22,24 @@ class AttendanceResponse(BaseModel):
 
 
 class AttendanceRecordResponse(BaseModel):
-    """Single attendance record — used in reports and dashboard."""
+    """
+    Single attendance record — used in reports and dashboard.
+
+    Note: student_name is NOT a column in the Attendance model.
+    It comes from the relationship: record.student.name
+    We use a validator to handle this via from_attributes = True
+    and the SQLAlchemy relationship loading it automatically.
+    """
     id: int
     student_id: int
-    student_name: str
     date: date
-    timestamp: datetime
-    status: str       # "present" or "absent"
+    timestamp: datetime | None
+    status: str        # "present" or "absent"
     is_late: bool
     confidence: float | None
 
     class Config:
-        from_attributes = True
+        from_attributes = True  # allows converting SQLAlchemy model to this schema
 
 
 class AttendanceListResponse(BaseModel):

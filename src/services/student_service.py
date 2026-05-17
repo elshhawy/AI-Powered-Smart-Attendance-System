@@ -5,8 +5,6 @@ from sqlalchemy.orm import Session
 
 from src.ai.recognition_pipeline import RecognitionPipeline
 from src.db.repositories.student_repository import StudentRepository
-from src.core.vector_index import VectorIndex
-from src.core.config import settings
 from src.models.student import Student
 
 
@@ -31,14 +29,16 @@ class FaceEnrollmentException(Exception):
 
 class StudentService:
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, pipeline: RecognitionPipeline):
         self.db = db
+        self.pipeline = pipeline
         self.student_repo = StudentRepository(db)
-        self.pipeline = RecognitionPipeline()
-        self.index = VectorIndex(
-            index_path=settings.FAISS_INDEX_PATH,
-            id_map_path=settings.FAISS_ID_MAP_PATH,
-        )
+
+        # Use the SAME index instance that lives inside the pipeline.
+        # Do NOT create a separate VectorIndex here — that would make two
+        # separate FAISS instances pointing at the same files, and additions
+        # through one would not be visible to the other.
+        self.index = self.pipeline.index
 
     def enroll_student(
         self,
@@ -54,7 +54,7 @@ class StudentService:
                 f"Student with code '{student_code}' already exists."
             )
 
-        # Step 2 — Extract face embedding
+        # Step 2 — Extract face embedding from photo
         try:
             embedding = self.pipeline.get_embedding_for_enrollment(face_image)
         except Exception as e:
@@ -71,9 +71,11 @@ class StudentService:
         })
 
         # Step 4 — Save embedding to FAISS
+        # We use the same index instance as the pipeline (single source of truth)
         try:
             self.index.add(student_id=student.id, embedding=embedding)
         except Exception as e:
+            # FAISS failed — roll back the PostgreSQL insert to keep both in sync
             self.student_repo.delete(student.id)
             raise FaceEnrollmentException(
                 f"Failed to save face to index: {e}"
@@ -87,6 +89,7 @@ class StudentService:
             raise StudentNotFoundException(
                 f"Student with id {student_id} not found."
             )
+        # Remove from FAISS first, then from PostgreSQL
         self.index.remove(student_id)
         self.student_repo.delete(student_id)
         return True

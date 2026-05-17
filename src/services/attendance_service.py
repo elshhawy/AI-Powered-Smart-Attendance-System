@@ -1,5 +1,5 @@
 # src/services/attendance_service.py
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 import numpy as np
 from sqlalchemy.orm import Session
 
@@ -44,11 +44,13 @@ class AttendanceRecord:
 
 class AttendanceService:
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, pipeline: RecognitionPipeline):
         self.db = db
+        self.pipeline = pipeline
         self.attendance_repo = AttendanceRepository(db)
         self.student_repo = StudentRepository(db)
-        self.pipeline = RecognitionPipeline()
+
+    # ── Core: process camera frame ────────────────────────────────────────────
 
     def process_frame(self, frame: np.ndarray) -> AttendanceRecord:
         # Step 1 — Run AI pipeline
@@ -68,9 +70,9 @@ class AttendanceService:
             )
 
         today = date.today()
-        now = datetime.now()
+        now = datetime.now(timezone.utc)  # ✅ timezone-aware (replaces deprecated utcnow)
 
-        # Step 4 — Check for duplicate attendance
+        # Step 4 — Check for duplicate attendance today
         already_marked = self.attendance_repo.check_duplicate(
             student_id=student.id,
             check_date=today,
@@ -88,7 +90,7 @@ class AttendanceService:
         # Step 5 — Determine if late
         is_late = self._is_late(now)
 
-        # Step 6 — Save attendance to PostgreSQL
+        # Step 6 — Save attendance record to PostgreSQL
         self.attendance_repo.create({
             "student_id": student.id,
             "date": today,
@@ -106,7 +108,10 @@ class AttendanceService:
             already_marked=False,
         )
 
+    # ── Queries ───────────────────────────────────────────────────────────────
+
     def get_today_attendance(self, organization_id: int) -> list[Attendance]:
+        """Return all attendance records for today for a given organization."""
         today = date.today()
         return self.attendance_repo.get_by_date_range(
             date_from=today,
@@ -120,20 +125,25 @@ class AttendanceService:
         start_date: date,
         end_date: date,
     ) -> list[Attendance]:
+        """Return attendance records between two dates for a given organization."""
         return self.attendance_repo.get_by_date_range(
             date_from=start_date,
             date_to=end_date,
             org_id=organization_id,
         )
 
+    # ── End-of-day: mark absents ──────────────────────────────────────────────
+
     def mark_absents(self, organization_id: int) -> int:
-        # Get all students in organization
+        """
+        Mark all students who never appeared today as absent.
+        Returns the number of students marked absent.
+        """
         students = self.student_repo.get_by_organization(organization_id)
         today = date.today()
         count = 0
 
         for student in students:
-            # Only mark absent if no record exists for today
             already_recorded = self.attendance_repo.check_duplicate(
                 student_id=student.id,
                 check_date=today,
@@ -147,17 +157,25 @@ class AttendanceService:
 
         return count
 
-    def get_student_statistics(self, student_id: int, start_date: date, end_date: date) -> dict:
-        records = self.attendance_repo.get_by_date_range(
+    # ── Statistics ────────────────────────────────────────────────────────────
+
+    def get_student_statistics(
+        self,
+        student_id: int,
+        start_date: date,
+        end_date: date,
+    ) -> dict:
+        """Return attendance statistics for one student over a date range."""
+        all_records = self.attendance_repo.get_by_date_range(
             date_from=start_date,
             date_to=end_date,
         )
-        # Filter for this student only
-        student_records = [r for r in records if r.student_id == student_id]
 
-        total = len(student_records)
-        present_days = sum(1 for r in student_records if r.status == "present")
-        late_days = sum(1 for r in student_records if r.is_late)
+        records = [r for r in all_records if r.student_id == student_id]
+
+        total = len(records)
+        present_days = sum(1 for r in records if r.status == "present")
+        late_days = sum(1 for r in records if r.is_late)
         percentage = (present_days / total * 100) if total > 0 else 0.0
 
         return {
@@ -167,10 +185,15 @@ class AttendanceService:
             "late_days": late_days,
         }
 
+    # ── Private helpers ───────────────────────────────────────────────────────
+
     def _is_late(self, now: datetime) -> bool:
+        """
+        Returns True if the current time is past the late threshold.
+        Late threshold = SESSION_START + LATE_THRESHOLD_MINUTES from .env
+        """
         late_minute = settings.SESSION_START_MINUTE + settings.LATE_THRESHOLD_MINUTES
         late_hour = settings.SESSION_START_HOUR + (late_minute // 60)
         late_minute = late_minute % 60
-
         late_time = time(hour=late_hour, minute=late_minute)
-        return now.time() > late_time
+        return now.time().replace(tzinfo=None) > late_time

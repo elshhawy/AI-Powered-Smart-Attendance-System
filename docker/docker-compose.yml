@@ -1,0 +1,58 @@
+# docker/docker-compose.yml — Development
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL Database ──────────────────────────────────────
+  db:
+    image: postgres:15
+    container_name: attendance_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: attendance_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # postgres_data is a named volume — data persists even if container is removed
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d attendance_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── FastAPI + AI Backend ─────────────────────────────────────
+  api:
+    build:
+      context: ..                      # Project root (one level up from docker/)
+      dockerfile: docker/Dockerfile    # Use our Dockerfile
+    container_name: attendance_api
+    env_file:
+      - ../.env                        # Load all variables from .env file
+    environment:
+      # Override DATABASE_URL to use 'db' (container name) instead of localhost
+      # Inside Docker network, containers talk to each other by name
+      # 'localhost' inside the api container = the api container itself (not the db!)
+      DATABASE_URL: postgresql://postgres:postgres123@db:5432/attendance_db
+    volumes:
+      - ../data:/app/data              # FAISS index files persist here
+      - ..:/app                        # Live code reload — changes reflect instantly
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy     # Wait for DB to pass healthcheck before starting
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
+    # alembic upgrade head runs first to make sure tables exist
+    # --reload means the server restarts automatically when you edit code
+    restart: unless-stopped
+
+# ── Named Volumes ────────────────────────────────────────────
+volumes:
+  postgres_data:
+  # Named volumes are managed by Docker — data survives container restarts and removals
+  # Location on Windows: \\wsl$\docker-desktop-data\...

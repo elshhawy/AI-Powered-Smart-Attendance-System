@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+venv/
+.env
+.env.*
+# Personal editor settings
+.vscode/
+
+# FAISS index files
+data/
+
+# Test images
+test_face.jpg
+*.jpg
+*.jpeg
+*.png

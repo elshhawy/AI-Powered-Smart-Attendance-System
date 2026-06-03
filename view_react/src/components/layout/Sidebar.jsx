@@ -1,8 +1,10 @@
+// view-react/src/components/layout/Sidebar.jsx
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, Users, Camera, BarChart3,
-  MessageSquare, Settings, LogOut, GraduationCap, ChevronDown
+  MessageSquare, Settings, LogOut, GraduationCap,
+  ChevronDown, BookOpen,
 } from 'lucide-react'
 import useAuthStore from '../../store/authStore'
 import { useState } from 'react'
@@ -11,6 +13,7 @@ import clsx from 'clsx'
 const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/students',  icon: Users,           label: 'Students' },
+  { to: '/courses',   icon: BookOpen,        label: 'Courses' },
   { to: '/camera',    icon: Camera,          label: 'Camera' },
   { to: '/reports',   icon: BarChart3,       label: 'Reports' },
   { to: '/chat',      icon: MessageSquare,   label: 'AI Assistant' },

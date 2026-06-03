@@ -1,3 +1,4 @@
+// view-react/src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import useAuthStore from './store/authStore'
@@ -5,6 +6,7 @@ import Layout from './components/layout/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
+import Courses from './pages/Courses'
 import Camera from './pages/Camera'
 import Reports from './pages/Reports'
 import Chatbot from './pages/Chatbot'
@@ -38,6 +40,7 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="students"  element={<Students />} />
+          <Route path="courses"   element={<Courses />} />
           <Route path="camera"    element={<Camera />} />
           <Route path="reports"   element={<Reports />} />
           <Route path="chat"      element={<Chatbot />} />

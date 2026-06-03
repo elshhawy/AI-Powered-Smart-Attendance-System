@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Request, Query
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
@@ -24,14 +24,12 @@ from src.schemas.attendance import (
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
-# Kiosk API key scheme — shows a lock icon in Swagger UI
 kiosk_key_scheme = APIKeyHeader(name="X-Api-Key", auto_error=False)
 
 
-# ── Helper ────────────────────────────────────────────────────────────────────
+# ── Helper ────────────────────────────────────────────────────
 
 async def read_image_file(file: UploadFile) -> np.ndarray:
-    """Convert uploaded image to OpenCV BGR numpy array."""
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
     image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -43,21 +41,23 @@ async def read_image_file(file: UploadFile) -> np.ndarray:
     return image
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Endpoints ─────────────────────────────────────────────────
 
 @router.post("/process", response_model=AttendanceResponse)
 async def process_frame(
     request: Request,
     frame: UploadFile = File(...),
+    org_id: int | None = Query(default=None, description="Organization ID for dynamic session detection"),
     db: Session = Depends(get_db),
     api_key: str = Depends(kiosk_key_scheme),
 ):
     """
-    Process a camera frame and record attendance if a student is recognised.
+    Process a camera frame and record attendance.
 
-    - Called by the kiosk (camera device), NOT the admin
-    - Authenticates using X-Api-Key header (KIOSK_API_KEY from .env)
-    - Uses the shared pipeline loaded at startup (fast — no model reloading)
+    - Authenticated via X-Api-Key header (kiosk device)
+    - If org_id is provided: automatically detects the active course session
+      and uses its late threshold dynamically
+    - If no org_id or no active session: falls back to .env settings
     """
     if not api_key or api_key != settings.KIOSK_API_KEY:
         raise HTTPException(
@@ -65,20 +65,23 @@ async def process_frame(
             detail="Invalid or missing kiosk API key",
         )
 
-    # Get the shared pipeline from app.state — loaded once at startup in main.py
     pipeline = request.app.state.pipeline
     image = await read_image_file(frame)
     service = AttendanceService(db, pipeline)
 
     try:
-        record = service.process_frame(image)
+        record = service.process_frame(image, org_id=org_id)
 
         if record.already_marked:
             message = f"Already marked! Welcome back, {record.student_name}."
         elif record.is_late:
-            message = f"You are late, {record.student_name}. Please see your instructor."
+            message = f"You are late, {record.student_name}."
         else:
             message = f"Welcome, {record.student_name}! Attendance recorded."
+
+        # Append course/session info to message if available
+        if record.course_name and record.session_type:
+            message += f" ({record.course_name} — {record.session_type})"
 
         return AttendanceResponse(
             student_id=record.student_id,
@@ -104,12 +107,10 @@ def get_today_attendance(
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
-    """Get today's attendance for an organization. Requires admin authentication."""
     pipeline = request.app.state.pipeline
     service = AttendanceService(db, pipeline)
     records = service.get_today_attendance(organization_id)
     today = date.today()
-
     return AttendanceListResponse(
         records=[AttendanceRecordResponse.model_validate(r) for r in records],
         total=len(records),
@@ -127,11 +128,9 @@ def get_attendance_range(
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
-    """Get attendance for a date range. Requires admin authentication."""
     pipeline = request.app.state.pipeline
     service = AttendanceService(db, pipeline)
     records = service.get_attendance_range(organization_id, start_date, end_date)
-
     return AttendanceListResponse(
         records=[AttendanceRecordResponse.model_validate(r) for r in records],
         total=len(records),
@@ -147,11 +146,9 @@ def mark_absents(
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
-    """Mark all students who haven't checked in today as absent. Requires admin authentication."""
     pipeline = request.app.state.pipeline
     service = AttendanceService(db, pipeline)
     count = service.mark_absents(organization_id)
-
     return MarkAbsentResponse(
         marked_count=count,
         date=date.today(),
@@ -168,12 +165,7 @@ def get_student_statistics(
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
-    """Get attendance statistics for a single student. Requires admin authentication."""
     pipeline = request.app.state.pipeline
     service = AttendanceService(db, pipeline)
     stats = service.get_student_statistics(student_id, start_date, end_date)
-
-    return AttendanceStatisticsResponse(
-        student_id=student_id,
-        **stats,
-    )
+    return AttendanceStatisticsResponse(student_id=student_id, **stats)

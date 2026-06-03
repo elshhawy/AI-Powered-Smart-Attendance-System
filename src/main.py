@@ -7,6 +7,7 @@ from src.api.v1.endpoints.auth import router as auth_router
 from src.api.v1.endpoints.students import router as students_router
 from src.api.v1.endpoints.attendance import router as attendance_router
 from src.api.v1.endpoints.chat import router as chat_router
+from src.api.v1.endpoints.courses import router as courses_router
 
 
 @asynccontextmanager
@@ -41,6 +42,7 @@ app.include_router(auth_router,       prefix="/api/v1")
 app.include_router(students_router,   prefix="/api/v1")
 app.include_router(attendance_router, prefix="/api/v1")
 app.include_router(chat_router,       prefix="/api/v1")
+app.include_router(courses_router,    prefix="/api/v1")
 
 
 @app.get("/")

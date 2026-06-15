@@ -58,9 +58,10 @@ services:
     environment:
       VITE_API_URL: http://localhost:8000
       VITE_KIOSK_KEY: kiosk-secret-key-change-this-in-production-123
+      VITE_GOOGLE_CLIENT_ID: "535646474910-hei55bgq89lr5paqdf0o6gu92s62jest.apps.googleusercontent.com"
     volumes:
-      - ../view-react:/app/view-react
-      - /app/view-react/node_modules
+      - ../view_react:/app/view_react
+      - /app/view_react/node_modules
     ports:
       - "3000:3000"
     depends_on:

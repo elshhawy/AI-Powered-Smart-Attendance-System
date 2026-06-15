@@ -1,34 +1,43 @@
+// view-react/src/store/authStore.js
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 const useAuthStore = create(
   persist(
     (set, get) => ({
-      accessToken: null,
+      accessToken:  null,
       refreshToken: null,
-      adminName: null,
-      orgId: 1,
+      userName:     null,
+      role:         null,   // "admin" | "student"
+      studentId:    null,   // only set when role = "student"
+      orgId:        1,
 
       login: (data) => set({
-        accessToken: data.access_token,
+        accessToken:  data.access_token,
         refreshToken: data.refresh_token,
-        adminName: data.admin_name,
+        userName:     data.user_name,
+        role:         data.role,
+        studentId:    data.student_id || null,
       }),
 
       logout: () => set({
-        accessToken: null,
+        accessToken:  null,
         refreshToken: null,
-        adminName: null,
+        userName:     null,
+        role:         null,
+        studentId:    null,
       }),
 
       setTokens: (access, refresh) => set({
-        accessToken: access,
+        accessToken:  access,
         refreshToken: refresh,
       }),
 
       setOrgId: (id) => set({ orgId: id }),
 
       isLoggedIn: () => !!get().accessToken,
+      isAdmin:    () => get().role === 'admin',
+      isStudent:  () => get().role === 'student',
     }),
     { name: 'auth-store' }
   )

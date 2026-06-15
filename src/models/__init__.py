@@ -5,3 +5,4 @@ from src.models.course import Course
 from src.models.course_session import CourseSession
 from src.models.student import Student
 from src.models.attendance import Attendance
+from src.models.user import User

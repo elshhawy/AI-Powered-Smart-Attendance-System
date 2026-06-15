@@ -8,67 +8,44 @@ from sqlalchemy.orm import Session
 from src.core.config import settings
 from src.db.database import get_db
 
-# ── Constants ─────────────────────────────────────────────────────────────────
-ALGORITHM              = "HS256"
-ACCESS_EXPIRE_MINUTES  = 30
-REFRESH_EXPIRE_DAYS    = 7
+ALGORITHM             = "HS256"
+ACCESS_EXPIRE_MINUTES = 30
+REFRESH_EXPIRE_DAYS   = 7
 
-# oauth2_scheme tells FastAPI:
-# "look for a Bearer token in the Authorization header"
 http_bearer = HTTPBearer(auto_error=False)
 
 
-# ── Password hashing ──────────────────────────────────────────────────────────
+# ── Password ──────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:
-    """
-    Hash a plain-text password using bcrypt.
-    bcrypt automatically generates a random salt each time,
-    so the same password produces a different hash on every call.
-    This is intentional — it prevents rainbow table attacks.
-    """
-    return bcrypt.hashpw(
-        plain.encode("utf-8"),
-        bcrypt.gensalt()
-    ).decode("utf-8")
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """
-    Check if a plain-text password matches a stored bcrypt hash.
-    Returns True if they match, False if not.
-    """
-    return bcrypt.checkpw(
-        plain.encode("utf-8"),
-        hashed.encode("utf-8")
-    )
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
-# ── Token creation ────────────────────────────────────────────────────────────
+# ── Tokens ────────────────────────────────────────────────────
 
-def create_access_token(admin_id: int) -> str:
+def create_access_token(user_id: int, role: str, student_id: int | None = None) -> str:
     """
-    Create a JWT access token for an admin.
-    The token contains:
-      - sub: the admin's database id (as a string)
-      - exp: expiry timestamp (30 minutes from now)
-      - type: "access" (so we can reject refresh tokens used as access tokens)
+    Create JWT access token with role and student_id embedded.
+    This is what allows the frontend to know the user's role immediately.
     """
     payload = {
-        "sub":  str(admin_id),
-        "exp":  datetime.utcnow() + timedelta(minutes=ACCESS_EXPIRE_MINUTES),
-        "type": "access",
+        "sub":        str(user_id),
+        "role":       role,
+        "student_id": student_id,
+        "exp":        datetime.utcnow() + timedelta(minutes=ACCESS_EXPIRE_MINUTES),
+        "type":       "access",
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
-def create_refresh_token(admin_id: int) -> str:
-    """
-    Create a JWT refresh token.
-    Longer lifetime (7 days) but only accepted at /auth/refresh.
-    """
+def create_refresh_token(user_id: int, role: str) -> str:
     payload = {
-        "sub":  str(admin_id),
+        "sub":  str(user_id),
+        "role": role,
         "exp":  datetime.utcnow() + timedelta(days=REFRESH_EXPIRE_DAYS),
         "type": "refresh",
     }
@@ -76,64 +53,92 @@ def create_refresh_token(admin_id: int) -> str:
 
 
 def verify_token(token: str, expected_type: str) -> dict:
-    """
-    Decode and validate a JWT token.
-    Raises JWTError if signature invalid, expired, or wrong type.
-    """
     payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-
     if payload.get("type") != expected_type:
-        raise JWTError(
-            f"Wrong token type: expected '{expected_type}', "
-            f"got '{payload.get('type')}'"
-        )
+        raise JWTError(f"Wrong token type: expected '{expected_type}'")
     return payload
 
 
-# ── FastAPI dependencies ──────────────────────────────────────────────────────
+# ── Dependencies ──────────────────────────────────────────────
 
-def get_current_admin(
+def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(http_bearer),
     db: Session = Depends(get_db),
 ):
-    credentials_exception = HTTPException(
+    """
+    Base dependency — works for ANY logged-in user (admin or student).
+    Returns the User object from the users table.
+    """
+    exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
     if credentials is None:
-        raise credentials_exception
-
-    token = credentials.credentials
+        raise exc
 
     try:
-        payload  = verify_token(token, "access")
-        admin_id = int(payload["sub"])
+        payload = verify_token(credentials.credentials, "access")
+        user_id = int(payload["sub"])
     except (JWTError, KeyError, ValueError):
-        raise credentials_exception
+        raise exc
 
-    from src.db.repositories.admin_repository import AdminRepository
-    admin = AdminRepository(db).get_by_id(admin_id)
+    from src.db.repositories.user_repository import UserRepository
+    user = UserRepository(db).get_by_id(user_id)
 
-    if admin is None:
-        raise credentials_exception
-    if not admin.is_active:
+    if user is None:
+        raise exc
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Account is deactivated")
+
+    return user
+
+
+def require_admin(user=Depends(get_current_user)):
+    """
+    Dependency for admin-only endpoints.
+    Raises 403 if the user is not an admin.
+    """
+    if user.role != "admin":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Admin account is deactivated",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
         )
-    return admin
+    return user
 
+
+def require_student(user=Depends(get_current_user)):
+    """
+    Dependency for student-only endpoints.
+    Raises 403 if the user is not a student.
+    """
+    if user.role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Student access required",
+        )
+    return user
+
+
+# ── Backward compatibility ────────────────────────────────────
+# Keep get_current_admin working for existing endpoints
+# so we don't have to change all endpoints at once
+
+def get_current_admin(user=Depends(require_admin)):
+    """
+    Backward-compatible alias for require_admin.
+    Existing endpoints using Depends(get_current_admin) still work.
+    """
+    return user
+
+
+# ── Kiosk key ─────────────────────────────────────────────────
 
 def verify_kiosk_key(x_api_key: str | None = Header(default=None)):
-    """
-    FastAPI dependency for the camera/kiosk attendance endpoint.
-    Authenticates using a static API key stored in .env.
-    """
     if not x_api_key or x_api_key != settings.KIOSK_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing kiosk API key",
         )
-    return Trueي
+    return True

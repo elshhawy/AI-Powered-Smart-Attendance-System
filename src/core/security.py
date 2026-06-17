@@ -27,27 +27,25 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # ── Tokens ────────────────────────────────────────────────────
 
-def create_access_token(user_id: int, role: str, student_id: int | None = None) -> str:
-    """
-    Create JWT access token with role and student_id embedded.
-    This is what allows the frontend to know the user's role immediately.
-    """
+def create_access_token(user_id: int, role: str, student_id: int | None = None, organization_id: int | None = None) -> str:
     payload = {
-        "sub":        str(user_id),
-        "role":       role,
-        "student_id": student_id,
-        "exp":        datetime.utcnow() + timedelta(minutes=ACCESS_EXPIRE_MINUTES),
-        "type":       "access",
+        "sub":             str(user_id),
+        "role":            role,
+        "student_id":      student_id,
+        "organization_id": organization_id,
+        "exp":             datetime.utcnow() + timedelta(minutes=ACCESS_EXPIRE_MINUTES),
+        "type":            "access",
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
-def create_refresh_token(user_id: int, role: str) -> str:
+def create_refresh_token(user_id: int, role: str, organization_id: int | None = None) -> str:
     payload = {
-        "sub":  str(user_id),
-        "role": role,
-        "exp":  datetime.utcnow() + timedelta(days=REFRESH_EXPIRE_DAYS),
-        "type": "refresh",
+        "sub":             str(user_id),
+        "role":            role,
+        "organization_id": organization_id,
+        "exp":             datetime.utcnow() + timedelta(days=REFRESH_EXPIRE_DAYS),
+        "type":            "refresh",
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
@@ -100,7 +98,7 @@ def require_admin(user=Depends(get_current_user)):
     Dependency for admin-only endpoints.
     Raises 403 if the user is not an admin.
     """
-    if user.role != "admin":
+    if user.role not in ["admin", "super_admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
@@ -121,15 +119,34 @@ def require_student(user=Depends(get_current_user)):
     return user
 
 
+def require_super_admin(user=Depends(get_current_user)):
+    """
+    Dependency for super_admin-only endpoints (e.g. creating admin accounts).
+    Raises 403 if the user is not a super_admin.
+    """
+    if user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin access required",
+        )
+    return user
+
+
 # ── Backward compatibility ────────────────────────────────────
 # Keep get_current_admin working for existing endpoints
 # so we don't have to change all endpoints at once
 
 def get_current_admin(user=Depends(require_admin)):
     """
-    Backward-compatible alias for require_admin.
-    Existing endpoints using Depends(get_current_admin) still work.
+    Org-scoped admin dependency.
+    Regular 'admin' users carry their organization_id in the token;
+    'super_admin' users get None (unrestricted).
+    Attach token_org_id to the user object so endpoints can filter by it.
     """
+    # user.role is already confirmed == "admin" by require_admin
+    # Re-read org from the already-decoded token via a sub-dependency isn't
+    # clean, so we trust user.organization_id from the DB row (same source of truth).
+    user._scoped_org_id = user.organization_id  # None for super_admin, int for admin
     return user
 
 

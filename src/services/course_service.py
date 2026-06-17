@@ -68,7 +68,9 @@ class CourseService:
             raise CourseNotFoundException(f"Course {course_id} not found.")
         return self.course_repo.delete(course_id)
 
-    def list_courses(self, org_id: int) -> list[Course]:
+    def list_courses(self, org_id: int | None = None) -> list[Course]:
+        if org_id is None:
+            return self.course_repo.get_all()
         return self.course_repo.get_by_organization(org_id)
 
     def get_course(self, course_id: int) -> Course:

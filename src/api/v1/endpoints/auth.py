@@ -5,7 +5,7 @@ from jose import JWTError
 
 from src.db.database import get_db
 from src.db.repositories.user_repository import UserRepository
-from src.db.repositories.admin_repository import AdminRepository
+from src.models.organization import Organization
 from src.core.security import (
     verify_password,
     hash_password,
@@ -14,6 +14,7 @@ from src.core.security import (
     verify_token,
     get_current_user,
     require_admin,
+    require_super_admin,
 )
 from src.schemas.user import (
     SignUpRequest,
@@ -29,19 +30,22 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 DUMMY_HASH = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/lewohPNk2GL5tF3se"
 
 
-# ── Sign Up ───────────────────────────────────────────────────
+# ── Sign Up (students only) ─────────────────────────────────
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def signup(body: SignUpRequest, db: Session = Depends(get_db)):
     """
-    Register a new user (admin or student).
-
-    - role = "admin"   → can manage students, courses, attendance
-    - role = "student" → can only view their own attendance
-
-    Note: after signup, an existing admin must link the student account
-    to a student record using POST /auth/link-student
+    Public registration — STUDENTS ONLY.
+    Requires a valid `student_code` that already exists in the students table;
+    the account is auto-bound to that student record on creation.
+    Admin/super_admin accounts cannot be self-registered.
     """
+    if body.role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public signup is for students only. Admin accounts are created by a super_admin.",
+        )
+
     repo = UserRepository(db)
 
     if repo.email_exists(body.email):
@@ -56,19 +60,91 @@ def signup(body: SignUpRequest, db: Session = Depends(get_db)):
             detail="Password must be at least 6 characters",
         )
 
-    if body.role not in ("admin", "student"):
+    if not body.student_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Role must be 'admin' or 'student'",
+            detail="student_code is required for student signup",
+        )
+
+    from src.db.repositories.student_repository import StudentRepository
+    student = StudentRepository(db).get_by_code(body.student_code)
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid student_code: no matching student record",
+        )
+
+    if repo.get_by_student_id(student.id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This student record is already linked to an account",
         )
 
     user = repo.create({
         "email":           body.email,
         "hashed_password": hash_password(body.password),
         "full_name":       body.full_name,
-        "role":            body.role,
+        "role":            "student",
+        "is_active":       True,
+        "student_id":      student.id,
+        "organization_id": None,
+    })
+
+    return UserResponse.model_validate(user)
+
+
+# ── Admin Creation (super_admin only) ───────────────────────
+
+@router.post("/admins", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def create_admin(
+    body: SignUpRequest,
+    db: Session = Depends(get_db),
+    super_admin=Depends(require_super_admin),
+):
+    """
+    Create a new 'admin' user bound to an organization_id.
+    Only an authenticated super_admin can call this — there is no public path to it.
+    """
+    if body.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This endpoint only creates 'admin' accounts",
+        )
+
+    if not body.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="organization_id is required for admin accounts",
+        )
+
+    repo = UserRepository(db)
+
+    if repo.email_exists(body.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
+        )
+
+    if len(body.password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters",
+        )
+
+    if not db.get(Organization, body.organization_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found",
+        )
+
+    user = repo.create({
+        "email":           body.email,
+        "hashed_password": hash_password(body.password),
+        "full_name":       body.full_name,
+        "role":            "admin",
         "is_active":       True,
         "student_id":      None,
+        "organization_id": body.organization_id,
     })
 
     return UserResponse.model_validate(user)
@@ -80,8 +156,7 @@ def signup(body: SignUpRequest, db: Session = Depends(get_db)):
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     """
     Login with email + password.
-    Works for both admins and students.
-    Returns JWT tokens with role embedded.
+    Works for super_admin, admin, and student. Returns JWT tokens with role embedded.
     """
     repo = UserRepository(db)
     user = repo.get_by_email(body.email)
@@ -100,7 +175,6 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             detail="Account is deactivated",
         )
 
-    # Google-only users have no password
     if not user.hashed_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -108,12 +182,13 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
         )
 
     return TokenResponse(
-        access_token=  create_access_token(user.id, user.role, user.student_id),
-        refresh_token= create_refresh_token(user.id, user.role),
-        token_type=    "bearer",
-        user_name=     user.full_name,
-        role=          user.role,
-        student_id=    user.student_id,
+        access_token=    create_access_token(user.id, user.role, user.student_id, user.organization_id),
+        refresh_token=   create_refresh_token(user.id, user.role, user.organization_id),
+        token_type=      "bearer",
+        user_name=       user.full_name,
+        role=            user.role,
+        organization_id= user.organization_id,
+        student_id=      user.student_id,
     )
 
 
@@ -136,7 +211,7 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="User not found or deactivated")
 
     return {
-        "access_token": create_access_token(user.id, user.role, user.student_id),
+        "access_token": create_access_token(user.id, user.role, user.student_id, user.organization_id),
         "token_type":   "bearer",
         "role":         user.role,
     }
@@ -156,12 +231,9 @@ def get_me(user=Depends(get_current_user)):
 def link_student(
     body: LinkStudentRequest,
     db: Session = Depends(get_db),
-    admin=Depends(require_admin),
+    admin=Depends(get_current_admin),
 ):
-    """
-    Admin links a user account to a student record.
-    After this, the student can login and see their own attendance.
-    """
+    """Admin links a user account to a student record, scoped to their own org."""
     repo = UserRepository(db)
     user = repo.get_by_id(body.user_id)
 
@@ -171,9 +243,8 @@ def link_student(
     if user.role != "student":
         raise HTTPException(status_code=400, detail="User is not a student")
 
-    # Check student exists
     from src.db.repositories.student_repository import StudentRepository
-    student = StudentRepository(db).get_by_id(body.student_id)
+    student = StudentRepository(db).get_by_id_scoped(body.student_id, organization_id=admin._scoped_org_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student record not found")
 
@@ -186,8 +257,8 @@ def link_student(
 @router.get("/users", response_model=list[UserResponse])
 def list_users(
     db: Session = Depends(get_db),
-    admin=Depends(require_admin),
+    admin=Depends(get_current_admin),
 ):
-    """List all registered users. Admin only."""
-    users = UserRepository(db).get_all()
+    """List users visible to this admin; org-scoped for regular admins."""
+    users = UserRepository(db).get_all_scoped(organization_id=admin._scoped_org_id)
     return [UserResponse.model_validate(u) for u in users]

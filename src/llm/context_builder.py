@@ -22,7 +22,7 @@ class ContextBuilder:
         self.attendance_repo = AttendanceRepository(db)
         self.student_repo = StudentRepository(db)
 
-    def build_today_context(self, organization_id: int) -> str:
+    def build_today_context(self, organization_id: int | None = None) -> str:
         """
         Build a text summary of today's attendance for the LLM.
         """
@@ -36,7 +36,13 @@ class ContextBuilder:
         )
 
         # Get all students in the org
-        all_students = self.student_repo.get_by_organization(organization_id)
+        if organization_id:
+            all_students = self.student_repo.get_by_organization(organization_id)
+        else:
+            all_students = self.student_repo.get_all()
+
+        if not all_students:
+            return "No students found in this organization."
 
         if not all_students:
             return "No students found in this organization."

@@ -1,4 +1,4 @@
-// view-react/src/store/authStore.js
+// view_react/src/store/authStore.js
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -8,16 +8,17 @@ const useAuthStore = create(
       accessToken:  null,
       refreshToken: null,
       userName:     null,
-      role:         null,   // "admin" | "student"
-      studentId:    null,   // only set when role = "student"
-      orgId:        1,
+      role:         null,
+      studentId:    null,
+      orgId:        null,   // now sourced from token, not hardcoded
 
       login: (data) => set({
         accessToken:  data.access_token,
         refreshToken: data.refresh_token,
         userName:     data.user_name,
         role:         data.role,
-        studentId:    data.student_id || null,
+        studentId:    data.student_id  || null,
+        orgId:        data.organization_id || null,
       }),
 
       logout: () => set({
@@ -26,18 +27,20 @@ const useAuthStore = create(
         userName:     null,
         role:         null,
         studentId:    null,
+        orgId:        null,
       }),
 
-      setTokens: (access, refresh) => set({
-        accessToken:  access,
-        refreshToken: refresh,
-      }),
+      setTokens: (access, refresh) => set({ accessToken: access, refreshToken: refresh }),
 
-      setOrgId: (id) => set({ orgId: id }),
+      // orgId is now read-only from token; no setOrgId needed
+      // kept as no-op so old callers don't crash during migration
+      setOrgId: (id) => {},
 
-      isLoggedIn: () => !!get().accessToken,
-      isAdmin:    () => get().role === 'admin',
-      isStudent:  () => get().role === 'student',
+      isLoggedIn:    () => !!get().accessToken,
+      isAdmin:       () => get().role === 'admin',
+      isSuperAdmin:  () => get().role === 'super_admin',
+      isStudent:     () => get().role === 'student',
+      isStaff:       () => ['admin', 'super_admin'].includes(get().role),
     }),
     { name: 'auth-store' }
   )

@@ -9,6 +9,21 @@ class StudentRepository(BaseRepository[Student]):
     def __init__(self, db: Session):
         super().__init__(db, Student)
 
+    def get_all_scoped(
+        self,
+        organization_id: int | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Student]:
+        """
+        Return all students, optionally filtered by org.
+        Pass organization_id=None (super_admin) to get all students across all orgs.
+        """
+        q = self.db.query(Student)
+        if organization_id is not None:
+            q = q.filter(Student.organization_id == organization_id)
+        return q.order_by(Student.name).offset(skip).limit(limit).all()
+    
     def get_by_code(self, code: str) -> Student | None:
         """
         Find a student by their university student code (e.g. "CS2024001").
@@ -32,15 +47,24 @@ class StudentRepository(BaseRepository[Student]):
             .all()
         )
 
-    def search_by_name(self, name: str) -> list[Student]:
-        """
-        Case-insensitive partial name search.
-        ilike means "case-insensitive LIKE".
-        The % signs mean "any characters before and after".
-        search_by_name("ahmed") matches "Ahmed Khaled", "Mohamed Ahmed", etc.
-        """
-        return (
-            self.db.query(Student)
-            .filter(Student.name.ilike(f"%{name}%"))
-            .all()
-        )
+    def search_by_name(
+        self,
+        name: str,
+        organization_id: int | None = None,
+    ) -> list[Student]:
+        """Scoped partial name search — org-filtered for regular admins."""
+        q = self.db.query(Student).filter(Student.name.ilike(f"%{name}%"))
+        if organization_id is not None:
+            q = q.filter(Student.organization_id == organization_id)
+        return q.all()
+
+    def get_by_id_scoped(
+        self,
+        student_id: int,
+        organization_id: int | None = None,
+    ) -> Student | None:
+        """Fetch a single student, enforcing org scope for regular admins."""
+        q = self.db.query(Student).filter(Student.id == student_id)
+        if organization_id is not None:
+            q = q.filter(Student.organization_id == organization_id)
+        return q.first()

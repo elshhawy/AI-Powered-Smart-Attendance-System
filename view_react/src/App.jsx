@@ -36,7 +36,7 @@ const PrivateRoute = ({ children }) => {
 const AdminRoute = ({ children }) => {
   const { accessToken, role } = useAuthStore()
   if (!accessToken) return <Navigate to="/login" replace />
-  if (role !== 'admin') return <Navigate to="/student/dashboard" replace />
+  if (!['admin', 'super_admin'].includes(role)) return <Navigate to="/student/dashboard" replace />
   return children
 }
 
@@ -82,6 +82,7 @@ export default function App() {
           <Route path="reports"   element={<Reports />} />
           <Route path="chat"      element={<Chatbot />} />
           <Route path="settings"  element={<Settings />} />
+          <Route path="settings/add-admin" element={<Settings />} />
         </Route>
 
         {/* Student routes */}

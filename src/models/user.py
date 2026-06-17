@@ -36,7 +36,7 @@ class User(Base):
         String(20),
         nullable=False,
         default="admin",
-        # "admin" | "student"
+        # "super_admin" | "admin" | "student"
     )
 
     # Only set when role = "student"
@@ -44,6 +44,15 @@ class User(Base):
     student_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("students.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    
+    # Only set when role = "admin" (binds an admin to exactly one org).
+    # Null for super_admin (sees all orgs) and student (scoped via student_id).
+    organization_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -60,4 +69,11 @@ class User(Base):
     student: Mapped["Student | None"] = relationship(
         "Student",
         foreign_keys=[student_id],
+    )
+
+    # Relationship to organization record (admin scoping)
+    organization: Mapped["Organization | None"] = relationship(
+        "Organization",
+        foreign_keys=[organization_id],
+        back_populates="users",
     )

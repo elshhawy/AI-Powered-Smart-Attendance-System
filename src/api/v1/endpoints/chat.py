@@ -20,7 +20,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    organization_id: int
+    organization_id: int | None = None
     history: list[ChatMessage] = []  # previous messages for multi-turn chat
 
 
@@ -35,7 +35,7 @@ class ChatResponse(BaseModel):
 def chat(
     body: ChatRequest,
     db: Session = Depends(get_db),
-    current_admin=Depends(get_current_admin),
+    admin=Depends(get_current_admin),
 ):
     """
     Send a message to the AI attendance assistant.
@@ -48,9 +48,17 @@ def chat(
         - "من الغايبين النهارده؟"
     """
     try:
+
+        # Scope enforcement
+        org_id = body.organization_id
+        if admin._scoped_org_id is not None:
+            if org_id is not None and org_id != admin._scoped_org_id:
+                raise HTTPException(status_code=403, detail="Cannot chat about foreign orgs.")
+            org_id = admin._scoped_org_id
+            
         # Step 1 — Build context from DB
         builder = ContextBuilder(db)
-        context = builder.build_today_context(body.organization_id)
+        context = builder.build_today_context(org_id)
 
         # Step 2 — Convert history to the format Groq expects
         history = [

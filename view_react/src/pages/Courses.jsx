@@ -9,7 +9,7 @@ import toast from 'react-hot-toast'
 import {
   listCourses, createCourse, updateCourse, deleteCourse,
   addCourseSession, updateCourseSession, deleteCourseSession,
-  getActiveSession,
+  getActiveSession, listOrganizations
 } from '../api'
 import useAuthStore from '../store/authStore'
 import clsx from 'clsx'
@@ -41,7 +41,8 @@ export default function Courses() {
   const [showSessionModal, setShowSessionModal] = useState(null) // course_id
   const [editingCourse, setEditingCourse] = useState(null)
   const [editingSession, setEditingSession] = useState(null)
-  const { orgId } = useAuthStore()
+  const [orgMap, setOrgMap] = useState({}) // <-- NEW STATE
+  const { orgId, role } = useAuthStore()
 
   const load = async () => {
     setLoading(true)
@@ -52,6 +53,13 @@ export default function Courses() {
       ])
       setCourses(coursesRes.data.courses || [])
       setActiveSession(activeRes.data)
+// <-- NEW: Fetch and map organization names for Super Admin -->
+      if (role === 'super_admin') {
+        const orgsRes = await listOrganizations()
+        const map = {}
+        orgsRes.data.forEach(o => { map[o.id] = o.name })
+        setOrgMap(map)
+      }
     } catch { toast.error('Failed to load courses') }
     finally { setLoading(false) }
   }
@@ -93,6 +101,13 @@ export default function Courses() {
     } catch { toast.error('Failed to update session') }
   }
 
+  const groupedCourses = courses.reduce((groups, course) => {
+    const org = course.organization_id || 'Unassigned'
+    if (!groups[org]) groups[org] = []
+    groups[org].push(course)
+    return groups
+  }, {})
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -101,9 +116,11 @@ export default function Courses() {
           <h1 className="page-title">Courses</h1>
           <p className="page-subtitle mt-1">{courses.length} courses — manage schedules dynamically</p>
         </div>
-        <button onClick={() => setShowCourseModal(true)} className="btn-primary flex items-center gap-2 text-sm">
-          <Plus size={15} /> Add Course
-        </button>
+        {role !== 'super_admin' && (
+          <button onClick={() => setShowCourseModal(true)} className="btn-primary flex items-center gap-2 text-sm">
+            <Plus size={15} /> Add Course
+          </button>
+        )}
       </div>
 
       {/* Active Session Banner */}
@@ -135,6 +152,32 @@ export default function Courses() {
           <BookOpen size={48} className="text-slate-700 mx-auto mb-3" />
           <p className="text-slate-400 font-medium">No courses yet</p>
           <p className="text-sm text-slate-600 mt-1">Click "Add Course" to get started</p>
+        </div>
+      ) : role === 'super_admin' ? (
+        <div className="space-y-8">
+          {Object.entries(groupedCourses).map(([orgId, orgCourses]) => (
+            <div key={orgId} className="space-y-3">
+              <div className="flex items-center gap-3 pb-1 border-b border-surface-800">
+                <div className="w-8 h-8 rounded-lg bg-surface-800 flex items-center justify-center text-slate-400 font-bold">#{orgId}</div>
+                <h3 className="text-lg font-semibold text-slate-200">{orgMap[orgId] || `Organization ${orgId}`}</h3>
+              </div>
+              {orgCourses.map((course) => (
+                <div key={course.id} className="card overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-surface-800 text-slate-500 flex items-center justify-center text-sm font-bold">
+                        {course.code.slice(0, 2)}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-slate-400">{course.name}</p>
+                        <p className="text-xs text-slate-500">{course.code} · {course.sessions.length} sessions</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       ) : (
         <div className="space-y-3">

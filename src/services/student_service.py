@@ -110,7 +110,9 @@ class StudentService:
             )
         return student
 
-    def list_students(self, organization_id: int) -> list[Student]:
+    def list_students(self, organization_id: int | None = None) -> list[Student]:
+        if organization_id is None:
+            return self.student_repo.get_all()
         return self.student_repo.get_by_organization(organization_id)
 
     def search_students(self, name_query: str) -> list[Student]:

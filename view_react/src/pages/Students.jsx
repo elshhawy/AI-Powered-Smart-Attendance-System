@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Users, Plus, Search, Trash2, Loader2, X, Upload, UserCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { listStudents, enrollStudent, deleteStudent } from '../api'
+import { listStudents, enrollStudent, deleteStudent, listOrganizations } from '../api'
 import useAuthStore from '../store/authStore'
 
 export default function Students() {
@@ -10,13 +10,21 @@ export default function Students() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const { orgId } = useAuthStore()
+  const [orgMap, setOrgMap] = useState({}) // <-- NEW STATE
+  const { orgId, role } = useAuthStore()
 
   const load = async () => {
     setLoading(true)
     try {
       const { data } = await listStudents(orgId)
       setStudents(data.students || [])
+// <-- NEW: Fetch and map organization names for Super Admin -->
+      if (role === 'super_admin') {
+        const orgsRes = await listOrganizations()
+        const map = {}
+        orgsRes.data.forEach(o => { map[o.id] = o.name })
+        setOrgMap(map)
+      }
     } catch { toast.error('Failed to load students') }
     finally { setLoading(false) }
   }
@@ -27,6 +35,13 @@ export default function Students() {
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.student_code.toLowerCase().includes(search.toLowerCase())
   )
+
+  const groupedStudents = filtered.reduce((groups, student) => {
+    const org = student.organization_id || 'Unassigned'
+    if (!groups[org]) groups[org] = []
+    groups[org].push(student)
+    return groups
+  }, {})
 
   const handleDelete = async (id, name) => {
     if (!confirm(`Delete ${name}?`)) return
@@ -46,9 +61,11 @@ export default function Students() {
           <h1 className="page-title">Students</h1>
           <p className="page-subtitle mt-1">{students.length} enrolled students</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2 text-sm">
-          <Plus size={15} /> Enroll Student
-        </button>
+        {role !== 'super_admin' && (
+          <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2 text-sm">
+            <Plus size={15} /> Enroll Student
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -75,6 +92,43 @@ export default function Students() {
             <p className="text-sm text-slate-600 mt-1">
               {search ? 'Try a different search' : 'Click "Enroll Student" to get started'}
             </p>
+          </div>
+        ) : role === 'super_admin' ? (
+          <div className="p-6 space-y-8">
+            {Object.entries(groupedStudents).map(([orgId, orgStudents]) => (
+              <div key={orgId} className="space-y-4">
+                <div className="flex items-center gap-3 pb-2 border-b border-surface-800">
+                  <div className="w-8 h-8 rounded-lg bg-surface-800 flex items-center justify-center text-slate-400 font-bold">
+                    #{orgId}
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-200">{orgMap[orgId] || `Organization ${orgId}`}</h3>
+                  <span className="text-xs text-slate-500 ml-auto">{orgStudents.length} students</span>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-surface-800">
+                      {['Student','Code','Enrolled'].map(h => (
+                        <th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orgStudents.map((s) => (
+                      <tr key={s.id} className="border-b border-surface-800/50 hover:bg-surface-800/30">
+                        <td className="px-4 py-2 flex items-center gap-3">
+                          <div className="w-6 h-6 rounded-full bg-primary-600/20 flex items-center justify-center text-primary-400 text-xs font-semibold">
+                            {s.name[0].toUpperCase()}
+                          </div>
+                          <span className="text-slate-200 font-medium">{s.name}</span>
+                        </td>
+                        <td className="px-4 py-2 text-slate-400 font-mono text-xs">{s.student_code}</td>
+                        <td className="px-4 py-2 text-slate-500">{s.enrollment_date}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
           </div>
         ) : (
           <table className="w-full text-sm">

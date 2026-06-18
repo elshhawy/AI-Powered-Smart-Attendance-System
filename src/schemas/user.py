@@ -1,6 +1,7 @@
 # src/schemas/user.py
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
+from typing import Literal
 
 
 # ── Request Schemas ───────────────────────────────────────────
@@ -9,9 +10,15 @@ class SignUpRequest(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    role: str = "admin"
-    # role = "admin" | "student"
-    # student must also provide student_id to link their account
+    role: Literal["super_admin", "admin", "student"] = "student"
+    # Public /auth/signup only ever accepts "student" (enforced in Step 3).
+    # "admin" / "super_admin" are only reachable via the protected
+    # admin-creation endpoint, which reuses this same request shape.
+    organization_id: int | None = None
+    # Required when role = "admin"; ignored otherwise.
+    student_code: str | None = None
+    # Required when role = "student"; verified against students table
+    # to auto-bind student_id (Step 3).
 
 
 class LoginRequest(BaseModel):
@@ -35,7 +42,8 @@ class UserResponse(BaseModel):
     id: int
     email: str
     full_name: str
-    role: str
+    role: Literal["super_admin", "admin", "student"]
+    organization_id: int | None
     student_id: int | None
     is_active: bool
     created_at: datetime
@@ -48,5 +56,6 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str
     user_name: str
-    role: str
+    role: Literal["super_admin", "admin", "student"]
+    organization_id: int | None = None
     student_id: int | None = None

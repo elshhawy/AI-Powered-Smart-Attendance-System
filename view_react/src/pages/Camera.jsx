@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Camera as CameraIcon, Upload, CheckCircle, XCircle, Clock, RefreshCw, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { processFrame } from '../api'
+import useAuthStore from '../store/authStore'
 
 const KIOSK_KEY = import.meta.env.VITE_KIOSK_KEY || 'kiosk-secret-key-change-this-in-production-123'
 
@@ -14,13 +15,18 @@ export default function Camera() {
   const [result, setResult] = useState(null)
   const [preview, setPreview] = useState(null)
 
+// 2. GET THE ORG ID FROM THE STORE
+  const { orgId } = useAuthStore()
+
   const process = async (file) => {
     setProcessing(true)
     setResult(null)
     try {
       const fd = new FormData()
       fd.append('frame', file)
-      const { data } = await processFrame(fd)
+      
+// 3. PASS THE ORG ID TO THE API CALL
+      const { data } = await processFrame(fd, orgId) 
       setResult(data)
     } catch (e) {
       const msg = e.response?.data?.detail || 'Processing failed'

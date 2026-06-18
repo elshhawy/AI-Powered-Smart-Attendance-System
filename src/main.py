@@ -9,7 +9,8 @@ from src.api.v1.endpoints.attendance import router as attendance_router
 from src.api.v1.endpoints.chat import router as chat_router
 from src.api.v1.endpoints.courses import router as courses_router
 from src.api.v1.endpoints.google_auth import router as google_router
-
+from src.api.v1.endpoints.student_portal import router as student_portal_router # <-- NEW IMPORT
+from src.api.v1.endpoints.organizations import router as organizations_router # <-- ADD THIS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +31,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://attendance_ui:3000",
     ],
     allow_credentials=True,
@@ -43,7 +45,8 @@ app.include_router(students_router,   prefix="/api/v1")
 app.include_router(attendance_router, prefix="/api/v1")
 app.include_router(chat_router,       prefix="/api/v1")
 app.include_router(courses_router,    prefix="/api/v1")
-
+app.include_router(student_portal_router, prefix="/api/v1") # <-- NEW ROUTER INCLUDED
+app.include_router(organizations_router, prefix="/api/v1") # <-- ADD THIS
 
 @app.get("/")
 def root():

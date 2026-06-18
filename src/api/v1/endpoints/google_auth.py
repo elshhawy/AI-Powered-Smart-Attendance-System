@@ -52,16 +52,10 @@ async def google_token_login(
         if user:
             user = repo.update(user, {"google_id": google_id})
         else:
-            user = repo.create({
-                "email":           email,
-                "hashed_password": None,
-                "google_id":       google_id,
-                "full_name":       full_name,
-                "role":            "admin",
-                "is_active":       True,
-                "student_id":      None,
-                "created_at":      datetime.utcnow(),
-            })
+            raise HTTPException(
+                status_code=403,
+                detail="No account found for this Google email. Ask your super_admin to create one first.",
+            )
 
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Account is deactivated")

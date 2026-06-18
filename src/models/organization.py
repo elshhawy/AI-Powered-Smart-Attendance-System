@@ -27,3 +27,9 @@ class Organization(Base):
         "Student",
         back_populates="organization"
     )
+
+    # One organization → many admin users scoped to it.
+    users: Mapped[list["User"]] = relationship(
+        "User",
+        back_populates="organization"
+    )

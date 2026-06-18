@@ -53,3 +53,5 @@ export const googleTokenLogin = (accessToken) =>
   client.post('/api/v1/auth/google/token', { access_token: accessToken })
 // ── Admin Management (super_admin only) ───────────────────────
 export const createAdmin = (data) => client.post('/api/v1/auth/admins', data)
+export const createOrganization = (data) => client.post('/api/v1/organizations', data) // <-- ADD THIS
+export const listOrganizations = () => client.get('/api/v1/organizations')

@@ -74,28 +74,6 @@ export default function Sidebar() {
           </NavLink>
         ))}
 
-        {/* Super-admin-only section */}
-        {role === 'super_admin' && (
-          <>
-            <p className="section-label px-3 mt-4 mb-3">Super Admin</p>
-            <NavLink
-              to="/settings/add-admin"
-              className={({ isActive }) => clsx(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
-                isActive
-                  ? 'bg-amber-600/20 text-amber-400 border border-amber-500/20'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-surface-800'
-              )}
-            >
-              {({ isActive }) => (
-                <>
-                  <ShieldCheck size={17} className={isActive ? 'text-amber-400' : ''} />
-                  Add Admin
-                </>
-              )}
-            </NavLink>
-          </>
-        )}
       </nav>
 
       {/* Org badge — read-only, sourced from token */}

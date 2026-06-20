@@ -23,7 +23,9 @@ class StudentProfileResponse(BaseModel):
     student_id: int
     name: str
     student_code: str
+    email: str
     organization_id: int
+    organization_name: str
     enrollment_date: date
     attendance_percentage: float
     total_days: int
@@ -96,7 +98,9 @@ def get_my_profile(
         student_id=           student.id,
         name=                 student.name,
         student_code=         student.student_code,
+        email=                user.email,
         organization_id=      student.organization_id,
+        organization_name=    student.organization.name,
         enrollment_date=      student.enrollment_date,
         attendance_percentage=percentage,
         total_days=           total,

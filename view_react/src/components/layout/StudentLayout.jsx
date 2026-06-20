@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, CalendarDays, ClipboardList,
-  GraduationCap, LogOut,
+  GraduationCap, LogOut, MessageCircle,
 } from 'lucide-react'
 import useAuthStore from '../../store/authStore'
 import clsx from 'clsx'
@@ -12,6 +12,7 @@ const nav = [
   { to: '/student/dashboard',  icon: LayoutDashboard, label: 'My Dashboard' },
   { to: '/student/attendance', icon: ClipboardList,   label: 'My Attendance' },
   { to: '/student/schedule',   icon: CalendarDays,    label: 'My Schedule' },
+  { to: '/student/chat',       icon: MessageCircle,   label: 'AI Assistant' },
 ]
 
 export default function StudentLayout() {

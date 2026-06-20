@@ -24,6 +24,7 @@ import Settings from './pages/Settings'
 import StudentDashboard from './pages/student/StudentDashboard'
 import StudentAttendance from './pages/student/StudentAttendance'
 import StudentSchedule from './pages/student/StudentSchedule'
+import StudentChatbot from './pages/student/StudentChatbot'
 
 
 // ── Route Guards ──────────────────────────────────────────────
@@ -90,6 +91,7 @@ export default function App() {
           <Route path="dashboard"  element={<StudentDashboard />} />
           <Route path="attendance" element={<StudentAttendance />} />
           <Route path="schedule"   element={<StudentSchedule />} />
+          <Route path="chat"       element={<StudentChatbot />} />
         </Route>
       </Routes>
     </BrowserRouter>

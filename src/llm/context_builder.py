@@ -121,3 +121,48 @@ class ContextBuilder:
             lines.append("No at-risk students this week.")
 
         return "\n".join(lines)
+
+    def build_student_context(self, student_id: int) -> str:
+        """
+        Build a text summary of a single student's own attendance data.
+        Used for the student-facing chatbot — only their own info, nothing else
+        about other students is ever included here.
+        """
+        student = self.student_repo.get_by_id(student_id)
+        if not student:
+            return "Student record not found."
+
+        records = self.attendance_repo.get_by_student(student_id)
+
+        total = len(records)
+        present = sum(1 for r in records if r.status == "present" and not r.is_late)
+        late = sum(1 for r in records if r.is_late)
+        absent = sum(1 for r in records if r.status == "absent")
+        percentage = round(((present + late) / total * 100) if total else 0, 1)
+
+        lines = [
+            f"Student name: {student.name}",
+            f"Student code: {student.student_code}",
+            f"Total attendance records: {total}",
+            f"Present on time: {present}",
+            f"Late: {late}",
+            f"Absent: {absent}",
+            f"Attendance rate: {percentage}%",
+            "",
+        ]
+
+        if percentage < 75:
+            lines.append("Note: This student's attendance is below the required 75% threshold.")
+
+        # Recent records (last 10), most recent first
+        recent = sorted(records, key=lambda r: r.date, reverse=True)[:10]
+        if recent:
+            lines.append("\nRecent attendance history:")
+            for r in recent:
+                status_label = "Late" if r.is_late else ("Absent" if r.status == "absent" else "Present")
+                course_name = ""
+                if r.course_session_id and r.course_session:
+                    course_name = f" — {r.course_session.course.name}"
+                lines.append(f"  {r.date.strftime('%Y-%m-%d')}: {status_label}{course_name}")
+
+        return "\n".join(lines)

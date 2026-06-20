@@ -10,6 +10,9 @@ from src.db.repositories.attendance_repository import AttendanceRepository
 from src.db.repositories.student_repository import StudentRepository
 from src.db.repositories.course_session_repository import CourseSessionRepository
 from src.db.repositories.course_repository import CourseRepository
+from src.llm.context_builder import ContextBuilder
+from src.llm.prompts import build_student_prompt
+from src.llm.rag_pipeline import RAGPipeline
 
 router = APIRouter(prefix="/student", tags=["Student Portal"])
 
@@ -244,3 +247,59 @@ def get_my_statistics(
         "at_risk":                ((present + late) / total * 100 if total else 0) < 75,
         "by_course":              course_stats,
     }
+
+
+# ── Chatbot ───────────────────────────────────────────────────
+
+class StudentChatMessage(BaseModel):
+    role: str     # "user" or "assistant"
+    content: str
+
+
+class StudentChatRequest(BaseModel):
+    message: str
+    history: list[StudentChatMessage] = []
+
+
+class StudentChatResponse(BaseModel):
+    reply: str
+
+
+@router.post("/chat", response_model=StudentChatResponse)
+def student_chat(
+    body: StudentChatRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_student),
+):
+    """
+    Send a message to the AI assistant, scoped to the student's own
+    attendance data only. The student cannot see or ask about other
+    students through this endpoint.
+    """
+    if not user.student_id:
+        raise HTTPException(status_code=400, detail="Account not linked to student record")
+
+    try:
+        builder = ContextBuilder(db)
+        context = builder.build_student_context(user.student_id)
+
+        history = [{"role": msg.role, "content": msg.content} for msg in body.history]
+
+        pipeline = RAGPipeline()
+        system_prompt = build_student_prompt(context)
+
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(history[-10:])
+        messages.append({"role": "user", "content": body.message})
+
+        response = pipeline.client.chat.completions.create(
+            model=pipeline.MODEL,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=1024,
+        )
+
+        return StudentChatResponse(reply=response.choices[0].message.content)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")

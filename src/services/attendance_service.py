@@ -72,7 +72,15 @@ class AttendanceService:
             raise UnknownFaceException(
                 f"Student id {result.student_id} found in FAISS but not in database."
             )
-
+# --- NEW SECURITY CHECK ---
+        from fastapi import HTTPException
+        if org_id is not None and student.organization_id != org_id:
+            # The AI found a face, but it belongs to a different school/org!
+            raise HTTPException(
+                status_code=403, 
+                detail="Face matched a student in a different organization. Access denied."
+            )
+        # --------------------------
         today = date.today()
         now = datetime.now(timezone.utc)
 

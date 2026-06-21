@@ -1,24 +1,23 @@
-// view-react/src/pages/Login.jsx
+// view_react/src/pages/Login.jsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GraduationCap, Mail, Lock, ArrowRight, Loader2, User } from 'lucide-react'
+import { GraduationCap, Mail, Lock, ArrowRight, Loader2, User, Hash } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
 import toast from 'react-hot-toast'
-import { login, signup } from '../api'
-import { googleTokenLogin } from '../api'
+import { login, signup, googleTokenLogin } from '../api'
 import useAuthStore from '../store/authStore'
 
 export default function Login() {
-  const [tab, setTab]           = useState('login')
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [role, setRole]         = useState('admin')
-  const [loading, setLoading]   = useState(false)
+  const [tab, setTab]                 = useState('login')
+  const [email, setEmail]             = useState('')
+  const [password, setPassword]       = useState('')
+  const [fullName, setFullName]       = useState('')
+  const [studentCode, setStudentCode] = useState('')
+  const [loading, setLoading]         = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
-  const { login: storeLogin }   = useAuthStore()
-  const navigate                = useNavigate()
+  const { login: storeLogin }         = useAuthStore()
+  const navigate                      = useNavigate()
 
   // ── Email Login ────────────────────────────────────────────
   const handleLogin = async (e) => {
@@ -37,14 +36,15 @@ export default function Login() {
     }
   }
 
-  // ── Sign Up ────────────────────────────────────────────────
+  // Signup is students-only; role is fixed server-side
   const handleSignup = async (e) => {
     e.preventDefault()
-    if (!email || !password || !fullName) return toast.error('Please fill all fields')
+    if (!email || !password || !fullName || !studentCode)
+      return toast.error('Please fill all fields')
     if (password.length < 6) return toast.error('Password must be at least 6 characters')
     setLoading(true)
     try {
-      await signup({ email, password, full_name: fullName, role })
+      await signup({ email, password, full_name: fullName, role: 'student', student_code: studentCode })
       toast.success('Account created! Please sign in.')
       setTab('login')
       setPassword('')
@@ -197,19 +197,13 @@ export default function Login() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-400 mb-1.5 block">I am a</label>
-                  <div className="flex gap-2">
-                    {['admin', 'student'].map(r => (
-                      <button key={r} type="button" onClick={() => setRole(r)}
-                        className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
-                          role === r
-                            ? 'bg-primary-600/20 text-primary-400 border-primary-500/30'
-                            : 'bg-surface-800 text-slate-400 border-surface-700 hover:text-slate-200'
-                        }`}>
-                        {r === 'admin' ? '👨‍💼 Admin' : '🎓 Student'}
-                      </button>
-                    ))}
+                  <label className="text-xs font-medium text-slate-400 mb-1.5 block">Student Code</label>
+                  <div className="relative">
+                    <Hash size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input type="text" value={studentCode} onChange={e => setStudentCode(e.target.value)}
+                      placeholder="e.g. CS-2024-001" className="input pl-10" />
                   </div>
+                  <p className="text-xs text-slate-600 mt-1">Provided by your institution</p>
                 </div>
                 <button type="submit" disabled={loading}
                   className="btn-primary w-full flex items-center justify-center gap-2 py-3">

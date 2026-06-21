@@ -52,3 +52,18 @@ class UserRepository(BaseRepository[User]):
     def email_exists(self, email: str) -> bool:
         """Check if email is already registered."""
         return self.get_by_email(email) is not None
+    
+    def get_all_scoped(self, organization_id: int | None = None) -> list[User]:
+        """Admins + students visible to this org. None (super_admin) = everyone."""
+        if organization_id is None:
+            return self.db.query(User).all()
+        from src.models.student import Student
+        return (
+            self.db.query(User)
+            .outerjoin(Student, User.student_id == Student.id)
+            .filter(
+                ((User.role == "admin") & (User.organization_id == organization_id))
+                | ((User.role == "student") & (Student.organization_id == organization_id))
+            )
+            .all()
+        )

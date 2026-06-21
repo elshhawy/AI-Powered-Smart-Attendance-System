@@ -9,6 +9,15 @@ class AttendanceRepository(BaseRepository[Attendance]):
 
     def __init__(self, db: Session):
         super().__init__(db, Attendance)
+        
+    def get_by_student(self, student_id: int):
+        """Return all attendance records for a single student."""
+        return (
+            self.db.query(Attendance)
+            .filter(Attendance.student_id == student_id)
+            .order_by(Attendance.date.desc())
+            .all()
+        )
 
     def check_duplicate(
         self,
@@ -29,19 +38,28 @@ class AttendanceRepository(BaseRepository[Attendance]):
             Attendance.student_id == student_id,
             Attendance.date == check_date,
         )
-
         if course_session_id is not None:
             query = query.filter(Attendance.course_session_id == course_session_id)
-
         return query.first() is not None
 
-    def get_by_student(self, student_id: int) -> list[Attendance]:
-        return (
-            self.db.query(Attendance)
-            .filter(Attendance.student_id == student_id)
-            .order_by(Attendance.date.desc())
-            .all()
-        )
+    def get_by_student_scoped(
+        self,
+        student_id: int,
+        organization_id: int | None = None,
+    ) -> list[Attendance]:
+        """
+        Return attendance records for a student.
+        org scope ensures a regular admin can't pull records for a student
+        that belongs to a foreign org.
+        """
+        from src.models.student import Student
+
+        q = self.db.query(Attendance).filter(Attendance.student_id == student_id)
+        if organization_id is not None:
+            q = q.join(Student, Attendance.student_id == Student.id).filter(
+                Student.organization_id == organization_id
+            )
+        return q.order_by(Attendance.date.desc()).all()
 
     def get_by_date_range(
         self,
@@ -69,19 +87,55 @@ class AttendanceRepository(BaseRepository[Attendance]):
 
         return query.order_by(Attendance.date.desc()).all()
 
-    def get_absences_today(self) -> list[Attendance]:
-        return (
-            self.db.query(Attendance)
-            .filter(Attendance.date == date.today(), Attendance.status == "absent")
-            .all()
-        )
+    def get_statistics_scoped(
+        self,
+        student_id: int,
+        date_from: date,
+        date_to: date,
+        organization_id: int | None = None,
+    ) -> list[Attendance]:
+        """
+        Records for statistics calculation, with optional org scope guard.
+        Prevents a regular admin from pulling stats for a foreign student.
+        """
+        from src.models.student import Student
 
-    def get_late_today(self) -> list[Attendance]:
-        return (
-            self.db.query(Attendance)
-            .filter(Attendance.date == date.today(), Attendance.is_late == True)
-            .all()
+        q = self.db.query(Attendance).filter(
+            Attendance.student_id == student_id,
+            Attendance.date >= date_from,
+            Attendance.date <= date_to,
         )
+        if organization_id is not None:
+            q = q.join(Student, Attendance.student_id == Student.id).filter(
+                Student.organization_id == organization_id
+            )
+        return q.all()
+
+    def get_absences_today(self, organization_id: int | None = None) -> list[Attendance]:
+        from src.models.student import Student
+
+        q = self.db.query(Attendance).filter(
+            Attendance.date == date.today(),
+            Attendance.status == "absent",
+        )
+        if organization_id is not None:
+            q = q.join(Student, Attendance.student_id == Student.id).filter(
+                Student.organization_id == organization_id
+            )
+        return q.all()
+
+    def get_late_today(self, organization_id: int | None = None) -> list[Attendance]:
+        from src.models.student import Student
+
+        q = self.db.query(Attendance).filter(
+            Attendance.date == date.today(),
+            Attendance.is_late == True,
+        )
+        if organization_id is not None:
+            q = q.join(Student, Attendance.student_id == Student.id).filter(
+                Student.organization_id == organization_id
+            )
+        return q.all()
 
     def get_attendance_percentage(self, student_id: int) -> float:
         total = (

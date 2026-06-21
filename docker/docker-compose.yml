@@ -58,7 +58,7 @@ services:
       dockerfile: docker/Dockerfile.react
     container_name: attendance_ui
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: http://127.0.0.1:8000
       VITE_KIOSK_KEY: kiosk-secret-key-change-this-in-production-123
       VITE_GOOGLE_CLIENT_ID: "535646474910-hei55bgq89lr5paqdf0o6gu92s62jest.apps.googleusercontent.com"
     volumes:

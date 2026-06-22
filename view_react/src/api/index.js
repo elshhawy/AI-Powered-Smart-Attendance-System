@@ -44,6 +44,8 @@ export const getMyProfile    = ()           => client.get('/api/v1/student/me')
 export const getMyAttendance = (days = 30)  => client.get(`/api/v1/student/attendance?days=${days}`)
 export const getMySchedule   = ()           => client.get('/api/v1/student/schedule')
 export const getMyStatistics = (days = 30)  => client.get(`/api/v1/student/statistics?days=${days}`)
+export const sendStudentChat = (message, history) =>
+  client.post('/api/v1/student/chat', { message, history })
 
 // ── Chat ──────────────────────────────────────────────────────
 export const sendChat = (message, orgId, history) =>

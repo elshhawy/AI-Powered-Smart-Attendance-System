@@ -61,10 +61,11 @@ async def google_token_login(
         raise HTTPException(status_code=400, detail="Account is deactivated")
 
     return TokenResponse(
-        access_token=  create_access_token(user.id, user.role, user.student_id),
-        refresh_token= create_refresh_token(user.id, user.role),
+        access_token=  create_access_token(user.id, user.role, user.student_id, user.organization_id),
+        refresh_token= create_refresh_token(user.id, user.role, user.organization_id),
         token_type=    "bearer",
         user_name=     user.full_name,
         role=          user.role,
         student_id=    user.student_id,
+        organization_id= user.organization_id,  # ADD THIS
     )

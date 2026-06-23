@@ -1,6 +1,6 @@
 # src/api/v1/endpoints/student_portal.py
 from datetime import date, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query 
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -112,7 +112,7 @@ def get_my_profile(
 
 @router.get("/attendance", response_model=list[AttendanceRecordResponse])
 def get_my_attendance(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),  # ADD BOUNDS
     db: Session = Depends(get_db),
     user=Depends(require_student),
 ):
@@ -126,13 +126,8 @@ def get_my_attendance(
     end_date   = date.today()
     start_date = end_date - timedelta(days=days)
 
-    records = AttendanceRepository(db).get_by_date_range(
-        date_from=start_date,
-        date_to=end_date,
-    )
-
-    # Filter for this student only
-    my_records = [r for r in records if r.student_id == user.student_id]
+    records = AttendanceRepository(db).get_by_student(user.student_id)
+    my_records = [r for r in records if r.date >= start_date and r.date <= end_date]
 
     result = []
     for r in my_records:
@@ -198,7 +193,7 @@ def get_my_schedule(
 
 @router.get("/statistics")
 def get_my_statistics(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),  # ADD BOUNDS
     db: Session = Depends(get_db),
     user=Depends(require_student),
 ):
@@ -212,11 +207,8 @@ def get_my_statistics(
     end_date   = date.today()
     start_date = end_date - timedelta(days=days)
 
-    records = AttendanceRepository(db).get_by_date_range(
-        date_from=start_date,
-        date_to=end_date,
-    )
-    my_records = [r for r in records if r.student_id == user.student_id]
+    records = AttendanceRepository(db).get_by_student(user.student_id)
+    my_records = [r for r in records if r.date >= start_date and r.date <= end_date]
 
     total   = len(my_records)
     present = sum(1 for r in my_records if r.status == "present" and not r.is_late)

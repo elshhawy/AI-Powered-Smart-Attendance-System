@@ -18,15 +18,13 @@ export default function Camera() {
 // 2. GET THE ORG ID FROM THE STORE
   const { orgId } = useAuthStore()
 
-  const process = async (file) => {
+  const process = useCallback(async (file) => {
     setProcessing(true)
     setResult(null)
     try {
       const fd = new FormData()
       fd.append('frame', file)
-      
-// 3. PASS THE ORG ID TO THE API CALL
-      const { data } = await processFrame(fd, orgId) 
+      const { data } = await processFrame(fd, orgId)
       setResult(data)
     } catch (e) {
       const msg = e.response?.data?.detail || 'Processing failed'
@@ -35,7 +33,7 @@ export default function Camera() {
     } finally {
       setProcessing(false)
     }
-  }
+  }, [orgId])
 
   const handleUpload = (e) => {
     const f = e.target.files[0]
@@ -49,7 +47,7 @@ export default function Camera() {
     if (!img) return
     setPreview(img)
     fetch(img).then(r => r.blob()).then(b => process(new File([b], 'capture.jpg', { type: 'image/jpeg' })))
-  }, [webcamRef])
+  }, [webcamRef, process])
 
   const reset = () => { setResult(null); setPreview(null) }
 

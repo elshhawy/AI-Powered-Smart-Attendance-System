@@ -51,8 +51,6 @@ class ContextBuilder:
         if not all_students:
             return "No students found in this organization."
 
-        if not all_students:
-            return "No students found in this organization."
 
         # Separate present, late, absent
         present_ids = {r.student_id for r in records if r.status == "present" and not r.is_late}

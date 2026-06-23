@@ -10,7 +10,7 @@ from src.db.repositories.course_session_repository import CourseSessionRepositor
 from src.core.config import settings
 from src.models.attendance import Attendance
 from src.models.course_session import CourseSession
-
+from fastapi import HTTPException
 
 # ── Custom Exceptions ─────────────────────────────────────────
 
@@ -73,7 +73,6 @@ class AttendanceService:
                 f"Student id {result.student_id} found in FAISS but not in database."
             )
 # --- NEW SECURITY CHECK ---
-        from fastapi import HTTPException
         if org_id is not None and student.organization_id != org_id:
             # The AI found a face, but it belongs to a different school/org!
             raise HTTPException(
